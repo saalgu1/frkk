@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>AR Free Kick - Adaptive Tracking</title>
+    <title>AR Free Kick - Vector Control</title>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600&display=swap" rel="stylesheet">
@@ -104,6 +104,11 @@
             transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none;
             white-space: nowrap;
+            text-align: center;
+        }
+        
+        #aim-arrow {
+            font-size: 40px; display: block; margin-top: 10px; color: white;
         }
 
         #cam-status {
@@ -126,7 +131,10 @@
 
     <video id="input-video" playsinline></video>
     <div id="game-container"></div>
-    <div id="kick-feedback">POWER SHOT!</div>
+    <div id="kick-feedback">
+        <span id="feedback-text">POWER SHOT!</span>
+        <div id="aim-arrow">⬆</div>
+    </div>
 
     <div id="ui-layer">
         <div class="hud-top">
@@ -154,12 +162,11 @@
 
     <script>
         /**
-         * FREE KICK PRO - ADAPTIVE TRACKING
-         * Fixes: Normalized velocity based on player scale (shoulder width)
+         * FREE KICK PRO - VECTOR CONTROL
+         * Fixes: Kicking direction based on Swing Vector + Impact Point
          */
 
         const CONFIG = {
-            // Lower threshold because we now use normalized speed
             kickThreshold: 3.5, 
             goalWidth: 14,
             goalHeight: 7
@@ -173,7 +180,7 @@
             // Tracking history
             leftFootHist: [],
             rightFootHist: [],
-            playerScale: 1.0, // Scale factor (shoulder width)
+            playerScale: 1.0, 
             hipCenter: {x: 0.5, y: 0.5}
         };
 
@@ -209,7 +216,7 @@
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // Kick Zone Indicator (The Ring)
+        // Kick Zone Indicator
         const ringGeo = new THREE.RingGeometry(0.5, 0.6, 32);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
         const kickZone = new THREE.Mesh(ringGeo, ringMat);
@@ -251,7 +258,6 @@
         const ball = new THREE.Mesh(ballGeo, ballMat);
         ball.castShadow = true;
         
-        // Decals for ball rotation visibility
         const dotGeo = new THREE.SphereGeometry(0.15, 8, 8);
         const dotMat = new THREE.MeshBasicMaterial({ color: 0x2c3e50 });
         const d1=new THREE.Mesh(dotGeo,dotMat); d1.position.set(0.35,0,0); ball.add(d1);
@@ -260,7 +266,7 @@
 
         scene.add(ball);
 
-        // Virtual Feet (Visual Feedback)
+        // Virtual Feet
         const footGeo = new THREE.SphereGeometry(0.25, 16, 16);
         const footMatL = new THREE.MeshBasicMaterial({ color: 0xe74c3c, transparent: true, opacity: 0.6 });
         const footMatR = new THREE.MeshBasicMaterial({ color: 0x3498db, transparent: true, opacity: 0.6 });
@@ -282,23 +288,29 @@
 
         // --- Logic ---
 
-        function triggerKick(power, sideX) {
+        function triggerKick(power, footX, swingVelocityX) {
             if(state.ballState !== 'IDLE') return;
 
             state.ballState = 'FLYING';
-            kickZone.material.opacity = 0; // Hide zone on kick
+            kickZone.material.opacity = 0; 
 
-            // Physics calculation
-            // Power is now Normalized (approx 0 to 20 range)
-            
-            // Cap power for gameplay balance
+            // --- IMPROVED PHYSICS ---
             const effectivePower = Math.min(power, 25);
+            
+            // 1. Swing Direction (Major Factor)
+            // If swingVelocityX is negative, foot is moving left -> ball goes left
+            const swingDir = swingVelocityX * 0.5;
+
+            // 2. Impact Point (Minor Factor)
+            // If FootX > BallX (Positive Offset), it pushes ball Left (Negative)
+            const impactOffset = footX - ball.position.x;
+            const impactDir = -impactOffset * 1.5;
+
+            // Combine
+            const curve = swingDir + impactDir;
             
             const lift = Math.min(effectivePower * 0.08, 0.8); 
             const fwd = Math.min(effectivePower * 0.2, 1.8); 
-            
-            // Curve logic: Striking left of center curves ball right
-            const curve = sideX * 0.4;
 
             state.velocity.set(curve, lift, -fwd);
 
@@ -306,10 +318,19 @@
             const speedKm = Math.round(effectivePower * 8); 
             document.getElementById('speed-val').innerText = speedKm;
             
-            const feedback = document.getElementById('kick-feedback');
-            feedback.innerText = speedKm > 100 ? "ROCKET!" : (speedKm > 60 ? "POWER SHOT!" : "KICK!");
-            feedback.style.transform = "translate(-50%, -50%) scale(1)";
-            setTimeout(() => { feedback.style.transform = "translate(-50%, -50%) scale(0)"; }, 1000);
+            const feedbackText = document.getElementById('feedback-text');
+            const aimArrow = document.getElementById('aim-arrow');
+            
+            feedbackText.innerText = speedKm > 100 ? "ROCKET!" : "KICK!";
+            
+            // Arrow Direction
+            if(curve < -0.3) aimArrow.innerText = "⬅ Left";
+            else if(curve > 0.3) aimArrow.innerText = "Right ➡";
+            else aimArrow.innerText = "⬆ Center";
+            
+            const fbContainer = document.getElementById('kick-feedback');
+            fbContainer.style.transform = "translate(-50%, -50%) scale(1)";
+            setTimeout(() => { fbContainer.style.transform = "translate(-50%, -50%) scale(0)"; }, 1500);
 
             const bar = document.getElementById('p-bar');
             document.getElementById('p-meter-cont').style.display = 'block';
@@ -322,7 +343,8 @@
                 state.velocity.z *= 0.995; // Drag
 
                 ball.position.add(state.velocity);
-                ball.rotation.x -= state.velocity.z * 0.2; // Spin
+                ball.rotation.x -= state.velocity.z * 0.2; 
+                ball.rotation.z -= state.velocity.x * 0.2; // Sideways spin
 
                 // Floor bounce
                 if(ball.position.y < 0.4) {
@@ -338,14 +360,13 @@
                         document.getElementById('score-val').innerText = state.score;
                         state.ballState = 'RESETTING';
                         
-                        const fb = document.getElementById('kick-feedback');
+                        const fb = document.getElementById('feedback-text');
                         fb.innerText = "GOAL!!!";
-                        fb.style.color = "#2ecc71";
-                        fb.style.transform = "translate(-50%, -50%) scale(1)";
+                        document.getElementById('aim-arrow').innerText = "⚽";
+                        document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(1)";
                         
                         setTimeout(() => {
-                            fb.style.transform = "translate(-50%, -50%) scale(0)";
-                            fb.style.color = "#f1c40f";
+                            document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
                             resetBall();
                         }, 2000);
                     }
@@ -356,7 +377,6 @@
                     setTimeout(resetBall, 1000);
                 }
             } else {
-                // Idle pulse
                 const s = 1 + Math.sin(Date.now() * 0.005) * 0.1;
                 kickZone.scale.set(s, s, 1);
             }
@@ -366,31 +386,23 @@
 
         function updateFootTracking(landmark, history, mesh, isLeft) {
             const now = performance.now();
-            
-            // 1. Calculate Player Scale (Shoulder Width)
-            // This is crucial. If player is far, scale is small. We divide movement by scale.
-            // A small movement far away becomes a big normalized movement.
-            const scale = Math.max(state.playerScale, 0.05); // Prevent div by zero
+            const scale = Math.max(state.playerScale, 0.05);
 
-            // 2. Relative Position
-            // Instead of raw X, use X relative to Hip Center
+            // Relative Position
             const relX = (landmark.x - state.hipCenter.x) / scale; 
-            const relY = (landmark.y - state.hipCenter.y) / scale; // Y is height relative to hip
+            const relY = (landmark.y - state.hipCenter.y) / scale; 
 
-            // 3. Map to 3D World for Rendering
-            // The mapping factor '3.5' is tuned to make 'hip-width' steps feel 1:1 with world meters
+            // Map to World
             const mapX = relX * 3.5; 
-            // For Y (height), we want floor to be roughly 1.5 units below hip
             const mapY = (relY * -3.5) + 2.0; 
 
             // Interpolate for smoothness
             mesh.position.x += (mapX - mesh.position.x) * 0.3;
             mesh.position.y += (mapY - mesh.position.y) * 0.3;
-            mesh.position.z = -1.8; // Align with ball plane
+            mesh.position.z = -1.8; 
 
-            // 4. Velocity Calculation
             history.push({x: mapX, y: mapY, t: now});
-            if(history.length > 4) history.shift();
+            if(history.length > 5) history.shift();
 
             if(history.length >= 2) {
                 const recent = history[history.length-1];
@@ -398,19 +410,18 @@
                 const dt = (recent.t - old.t) / 1000;
                 
                 if(dt > 0.01) {
-                    const dist = Math.sqrt(Math.pow(recent.x - old.x, 2) + Math.pow(recent.y - old.y, 2));
-                    const speed = dist / dt; // Normalized Speed (Units per second)
-
-                    // 5. Collision Check (Intersection with Kick Zone)
-                    const ballDist = Math.abs(mesh.position.x - ball.position.x); // X offset
-                    const heightDiff = Math.abs(mesh.position.y - ball.position.y); // Y offset
+                    // Vector Velocity Calculation
+                    const vx = (recent.x - old.x) / dt; // Horizontal Swing Speed
+                    const vy = (recent.y - old.y) / dt;
                     
-                    // Trigger if:
-                    // 1. Speed is high enough
-                    // 2. Foot is horizontally close to ball
-                    // 3. Foot is vertically close to floor (y < 0.8)
+                    const speed = Math.sqrt(vx*vx + vy*vy);
+
+                    // Collision Check
+                    const ballDist = Math.abs(mesh.position.x - ball.position.x); 
+                    
+                    // Trigger if: High Speed + Close to ball + Foot is low
                     if(speed > CONFIG.kickThreshold && ballDist < 0.8 && mesh.position.y < 0.8) {
-                        triggerKick(speed, mesh.position.x);
+                        triggerKick(speed, mesh.position.x, vx);
                     }
                 }
             }
@@ -426,27 +437,20 @@
             const rightHip = lm[24];
 
             // Update Global Body State
-            // Calculate scale based on shoulder width
             const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
-            // Smooth the scale to prevent jitter
             state.playerScale = (state.playerScale * 0.9) + (shoulderWidth * 0.1);
             
-            // Calculate Hip Center
             const hipCX = (leftHip.x + rightHip.x) / 2;
             const hipCY = (leftHip.y + rightHip.y) / 2;
             state.hipCenter.x = (state.hipCenter.x * 0.8) + (hipCX * 0.2);
             state.hipCenter.y = (state.hipCenter.y * 0.8) + (hipCY * 0.2);
 
-            // Debug Info
             document.getElementById('debug-info').innerText = 
-                `Scale: ${state.playerScale.toFixed(3)} | Visibility: ${lm[27].visibility.toFixed(2)}`;
+                `Scale: ${state.playerScale.toFixed(3)} | Active`;
 
-            // Track Feet
-            // 27 = Left Ankle, 28 = Right Ankle
             if(lm[27].visibility > 0.5) updateFootTracking(lm[27], state.leftFootHist, leftFootMesh, true);
             if(lm[28].visibility > 0.5) updateFootTracking(lm[28], state.rightFootHist, rightFootMesh, false);
             
-            // Update UI status
             const status = document.getElementById('cam-status');
             if(lm[27].visibility > 0.5 || lm[28].visibility > 0.5) {
                 status.innerText = "PLAYER DETECTED";
@@ -485,7 +489,6 @@
             document.getElementById('cam-status').innerText = "Ready";
         });
 
-        // Loop
         function animate() {
             requestAnimationFrame(animate);
             updateBall();
