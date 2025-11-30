@@ -420,14 +420,29 @@
         kickZone.position.set(0, 0.05, -2);
         scene.add(kickZone);
 
-        // --- UPDATED: PLAYER STANDING ZONE (High Visibility) ---
-        // Using Cyan and Emissive properties to pop out
+        // --- UPDATED: PLAYER STANDING ZONE ---
         const zoneGeo = new THREE.RingGeometry(0.8, 1.0, 32);
         const zoneMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
         const playerZone = new THREE.Mesh(zoneGeo, zoneMat);
         playerZone.rotation.x = -Math.PI / 2;
         playerZone.position.set(0, 0.02, -1.0); 
         scene.add(playerZone);
+
+        // --- NEW: AIMING SYSTEM (POOL STYLE) ---
+        // 1. Aim Line
+        const aimGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-10)]);
+        const aimMat = new THREE.LineDashedMaterial({ color: 0x00ffff, dashSize: 0.5, gapSize: 0.2, linewidth: 2 });
+        const aimLine = new THREE.Line(aimGeo, aimMat);
+        aimLine.computeLineDistances();
+        scene.add(aimLine);
+        aimLine.visible = false;
+
+        // 2. Trajectory Ghost
+        const ghostBallGeo = new THREE.SphereGeometry(0.2, 16, 16);
+        const ghostBallMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5, wireframe: true });
+        const ghostBall = new THREE.Mesh(ghostBallGeo, ghostBallMat);
+        scene.add(ghostBall);
+        ghostBall.visible = false;
 
         const trailSize = 50;
         const trailGeo = new THREE.BufferGeometry();
@@ -505,15 +520,27 @@
         }
         particleSystem.visible = false;
 
-        const footGeo = new THREE.SphereGeometry(0.25, 16, 16);
-        const footMatL = new THREE.MeshBasicMaterial({ color: 0xe74c3c, transparent: true, opacity: 0.8, depthTest: false });
-        const footMatR = new THREE.MeshBasicMaterial({ color: 0x3498db, transparent: true, opacity: 0.8, depthTest: false });
+        // --- UPDATED: HOLOGRAPHIC FEET ---
+        // Using wireframe to look "Holographic" and "AR"
+        const footGeo = new THREE.SphereGeometry(0.25, 12, 12);
+        const footMatL = new THREE.MeshBasicMaterial({ color: 0xe74c3c, wireframe: true, transparent: true, opacity: 0.5 });
+        const footMatR = new THREE.MeshBasicMaterial({ color: 0x3498db, wireframe: true, transparent: true, opacity: 0.5 });
+        
         const leftFootMesh = new THREE.Mesh(footGeo, footMatL);
         const rightFootMesh = new THREE.Mesh(footGeo, footMatR);
+        // Important: renderOrder to make sure they are seen
         leftFootMesh.renderOrder = 999;
         rightFootMesh.renderOrder = 999;
+        
+        // Add glow inner sphere
+        const innerFootGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        leftFootMesh.add(new THREE.Mesh(innerFootGeo, new THREE.MeshBasicMaterial({color: 0xffffff})));
+        rightFootMesh.add(new THREE.Mesh(innerFootGeo, new THREE.MeshBasicMaterial({color: 0xffffff})));
+
         scene.add(leftFootMesh);
         scene.add(rightFootMesh);
+        
+        // Always visible in AR view, just moved off screen if not tracked
         leftFootMesh.visible = false;
         rightFootMesh.visible = false;
 
@@ -534,6 +561,12 @@
                 camera.lookAt(defaultLookAt);
                 if(camera.position.distanceTo(defaultCamPos) < 0.1) clearInterval(tween);
             }, 16);
+            
+            // Re-show feet for next round
+            if(state.phase === 'PLAYING') {
+                leftFootMesh.visible = true;
+                rightFootMesh.visible = true;
+            }
         }
         resetBall();
 
@@ -542,6 +575,9 @@
             AudioSys.playKick();
             state.ballState = 'FLYING';
             kickZone.material.opacity = 0; 
+            aimLine.visible = false;
+            ghostBall.visible = false;
+
             state.ballSafetyTimer = setTimeout(resetBall, 4000);
             const positions = trailLine.geometry.attributes.position.array;
             for(let i=0; i<trailSize*3; i++) positions[i] = ball.position.x;
@@ -558,6 +594,78 @@
             document.getElementById('p-meter-cont').style.display = 'block';
             bar.style.width = Math.min((speedKm / 120) * 100, 100) + "%";
             document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
+        }
+
+        // --- NEW: AIMING LOGIC ---
+        function updateAiming() {
+            if(state.ballState !== 'IDLE' || state.phase !== 'PLAYING') {
+                aimLine.visible = false;
+                ghostBall.visible = false;
+                return;
+            }
+
+            // Find closest foot
+            const leftDist = leftFootMesh.position.distanceTo(ball.position);
+            const rightDist = rightFootMesh.position.distanceTo(ball.position);
+            
+            let activeFoot = null;
+            let dist = 100;
+
+            if(leftDist < 1.5 && leftDist < rightDist) {
+                activeFoot = leftFootMesh;
+                dist = leftDist;
+                // Highlight active foot
+                leftFootMesh.material.color.setHex(0x00ff00);
+                leftFootMesh.material.opacity = 0.8;
+                rightFootMesh.material.color.setHex(0x3498db);
+                rightFootMesh.material.opacity = 0.3;
+            } else if (rightDist < 1.5) {
+                activeFoot = rightFootMesh;
+                dist = rightDist;
+                // Highlight active foot
+                rightFootMesh.material.color.setHex(0x00ff00);
+                rightFootMesh.material.opacity = 0.8;
+                leftFootMesh.material.color.setHex(0xe74c3c);
+                leftFootMesh.material.opacity = 0.3;
+            } else {
+                aimLine.visible = false;
+                ghostBall.visible = false;
+                leftFootMesh.material.opacity = 0.5;
+                rightFootMesh.material.opacity = 0.5;
+                return;
+            }
+
+            // Calculate Aim Vector based on foot position relative to ball
+            // If foot is Left of ball (negative x relative), ball goes Right (positive x)
+            const footX = activeFoot.position.x;
+            const relativeX = footX - ball.position.x; 
+            
+            // This multiplier mimics the "Kick Logic" in triggerKick
+            // impactOffset = relativeX * -2.0
+            // curve = impactOffset * 0.6  => relativeX * -1.2
+            const predictedCurve = relativeX * -1.2;
+            
+            // Visual scale
+            const targetZ = CONFIG.goalZ;
+            const targetX = ball.position.x + (predictedCurve * (Math.abs(targetZ)/2.5)); // Approx landing spot
+
+            // Update Aim Line
+            const positions = aimLine.geometry.attributes.position.array;
+            positions[0] = ball.position.x;
+            positions[1] = ball.position.y;
+            positions[2] = ball.position.z;
+            
+            positions[3] = targetX;
+            positions[4] = CONFIG.goalHeight / 2; // Aim for middle height approx
+            positions[5] = targetZ;
+            
+            aimLine.geometry.attributes.position.needsUpdate = true;
+            aimLine.computeLineDistances();
+            aimLine.visible = true;
+
+            // Update Ghost Ball (Target indicator)
+            ghostBall.position.set(targetX, CONFIG.goalHeight/2, targetZ);
+            ghostBall.visible = true;
         }
 
         function updateBall() {
@@ -835,6 +943,7 @@
             updateKeeper();
             updateTrail();
             updateParticles();
+            updateAiming();
             renderer.render(scene, camera);
         }
         animate();
