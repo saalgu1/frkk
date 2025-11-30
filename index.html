@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>AR Free Kick - Vector Control</title>
+    <title>AR Free Kick - Pro Edition</title>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600&display=swap" rel="stylesheet">
@@ -11,7 +11,7 @@
     <style>
         body {
             margin: 0; overflow: hidden;
-            background-color: #2c3e50;
+            background-color: #1a1a2e; /* Darker night sky */
             font-family: 'Teko', sans-serif;
             user-select: none; -webkit-user-select: none;
         }
@@ -33,16 +33,21 @@
 
         .hud-top {
             padding: 20px; display: flex; justify-content: space-between; color: white; text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
         }
 
         .score-box {
-            background: rgba(0,0,0,0.6); padding: 10px 20px;
-            border-left: 5px solid #2ecc71; font-size: 30px; letter-spacing: 2px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.4)); 
+            padding: 10px 25px;
+            border-radius: 8px;
+            border-left: 5px solid #2ecc71; font-size: 32px; letter-spacing: 2px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
 
         .power-meter-container {
-            width: 200px; height: 20px; background: rgba(0,0,0,0.5);
-            margin-top: 5px; border: 1px solid white; display: none; 
+            width: 220px; height: 24px; background: rgba(0,0,0,0.6);
+            margin-top: 8px; border: 2px solid rgba(255,255,255,0.3); border-radius: 12px; overflow: hidden;
+            display: none; 
         }
         .power-bar {
             height: 100%; width: 0%; background: linear-gradient(90deg, #f1c40f, #e74c3c); transition: width 0.1s;
@@ -51,47 +56,60 @@
         .center-card {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: #fff; padding: 30px; border-radius: 4px;
-            text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            pointer-events: auto; width: 90%; max-width: 400px;
+            background: rgba(255, 255, 255, 0.95); padding: 40px; border-radius: 12px;
+            text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            pointer-events: auto; width: 90%; max-width: 420px;
             transition: opacity 0.3s;
+            backdrop-filter: blur(10px);
         }
 
         .hidden { opacity: 0; pointer-events: none; }
 
-        h1 { margin: 0; color: #2c3e50; font-size: 48px; line-height: 1; }
-        p { font-family: sans-serif; color: #7f8c8d; margin-bottom: 20px; }
+        h1 { margin: 0; color: #2c3e50; font-size: 56px; line-height: 0.9; letter-spacing: 1px; }
+        p { font-family: sans-serif; color: #7f8c8d; margin-bottom: 24px; font-size: 16px; line-height: 1.5; }
 
         button {
-            background: #e74c3c; color: white; border: none; padding: 15px 40px;
-            font-size: 24px; font-family: 'Teko', sans-serif;
-            cursor: pointer; text-transform: uppercase; letter-spacing: 1px; width: 100%;
-            transition: background 0.2s;
+            background: linear-gradient(to right, #e74c3c, #c0392b); 
+            color: white; border: none; padding: 16px 40px; border-radius: 30px;
+            font-size: 28px; font-family: 'Teko', sans-serif;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 2px; width: 100%;
+            transition: transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 10px 20px rgba(231, 76, 60, 0.3);
         }
-        button:disabled { background: #95a5a6; cursor: wait; }
+        button:active { transform: scale(0.98); }
+        button:disabled { background: #bdc3c7; cursor: wait; box-shadow: none; }
 
         #setup-overlay {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; color: white; text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            display: none;
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: white; text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+            display: none; width: 100%;
         }
-        #setup-msg { font-size: 40px; color: #f1c40f; }
-        #countdown-txt { font-size: 120px; font-weight: bold; display: none; }
+        #setup-msg { font-size: 50px; color: #f1c40f; font-weight: 600; }
+        #countdown-txt { font-size: 180px; font-weight: bold; display: none; margin-top: -20px; color: white;}
 
         #kick-feedback {
-            position: absolute; top: 40%; left: 50%;
+            position: absolute; top: 35%; left: 50%;
             transform: translate(-50%, -50%) scale(0);
-            font-size: 80px; color: #f1c40f;
-            text-shadow: 4px 4px 0 #c0392b;
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: 90px; color: #fff;
+            text-shadow: 0 0 20px #f1c40f, 4px 4px 0 #c0392b;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none; white-space: nowrap; text-align: center;
+            z-index: 20;
         }
-        #aim-arrow { font-size: 40px; display: block; margin-top: 10px; color: white; }
+        #aim-arrow { font-size: 50px; display: block; margin-top: 5px; color: #f1c40f; text-shadow: 2px 2px 0 #000; }
 
         #debug-info {
             position: absolute; bottom: 10px; left: 10px;
-            color: rgba(255,255,255,0.5); font-family: monospace; font-size: 12px;
+            color: rgba(255,255,255,0.3); font-family: monospace; font-size: 10px;
             text-align: left;
+        }
+
+        /* Scanline effect for TV look */
+        #game-container::after {
+            content: " ";
+            display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px; z-index: 2; pointer-events: none;
         }
     </style>
 
@@ -125,8 +143,8 @@
         <div id="start-screen" class="center-card">
             <h1>FREE KICK PRO</h1>
             <p style="font-size: 60px; margin: 10px;">⚽</p>
-            <p>1. Tap Enable<br>2. Step Back (2-3m)<br>3. Stand Still to Start</p>
-            <button id="start-btn" disabled>Loading AI...</button>
+            <p>1. Enable Camera & Sound<br>2. Step Back (2-3m)<br>3. Beat the Keeper & The Wall</p>
+            <button id="start-btn" disabled>Loading Engine...</button>
         </div>
 
         <div id="setup-overlay">
@@ -139,17 +157,17 @@
 
     <script>
         /**
-         * FREE KICK PRO v6 - DIRECTION & DEPTH FIX
-         * Fixes: Inverted X-Axis for mirror mode, Feet Overlay Depth
+         * FREE KICK PRO - ULTIMATE EDITION
+         * Features: Goalkeeper AI, Defensive Wall, Particles, Trail Renderer, Synth Audio
          */
 
         const CONFIG = {
             kickThreshold: 2.0, 
             goalWidth: 14,
             goalHeight: 7,
-            goalZ: -18,
+            goalZ: -24, // Pushed back slightly for more travel time
             minScale: 0.25,
-            smoothing: 0.5
+            wallZ: -14, // Position of the defensive wall
         };
 
         let state = {
@@ -162,14 +180,59 @@
             playerScale: 1.0, 
             hipCenter: {x: 0.5, y: 0.5},
             setupTimer: 0,
-            ballSafetyTimer: null
+            ballSafetyTimer: null,
+            audioEnabled: false
+        };
+
+        // --- AUDIO SYSTEM (Web Audio API) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const AudioSys = {
+            playTone: (freq, type, duration, vol = 0.1) => {
+                if(!state.audioEnabled) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            },
+            playKick: () => {
+                AudioSys.playTone(150, 'triangle', 0.2, 0.3);
+                AudioSys.playTone(60, 'sine', 0.3, 0.5); // Thud
+            },
+            playGoal: () => {
+                // Fanfare-ish
+                [0, 0.1, 0.2].forEach((t, i) => setTimeout(() => AudioSys.playTone(400 + (i*100), 'square', 0.4, 0.1), t*1000));
+                // Crowd Noise (Simulated with filtered noise)
+                if(!state.audioEnabled) return;
+                const bufferSize = audioCtx.sampleRate * 2; 
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2);
+                noise.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start();
+            },
+            playHit: () => {
+                AudioSys.playTone(800, 'square', 0.1, 0.1); // Metal/Wood hit
+            }
         };
 
         // --- Three.js Setup ---
         const container = document.getElementById('game-container');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 15, 80);
+        scene.background = new THREE.Color(0x1a1a2e);
+        scene.fog = new THREE.Fog(0x1a1a2e, 10, 60);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
         camera.position.set(0, 2, 7); 
@@ -178,57 +241,151 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
-        scene.add(hemiLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(-5, 10, 5);
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(-10, 20, 10);
         dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 50;
+        dirLight.shadow.camera.left = -20;
+        dirLight.shadow.camera.right = 20;
+        dirLight.shadow.camera.top = 20;
+        dirLight.shadow.camera.bottom = -20;
         scene.add(dirLight);
 
-        // --- Objects ---
-        const grassGeo = new THREE.PlaneGeometry(200, 200);
-        const grassMat = new THREE.MeshStandardMaterial({ color: 0x27ae60, roughness: 1 });
-        const ground = new THREE.Mesh(grassGeo, grassMat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        scene.add(ground);
+        // Stadium Lights (Visual only)
+        function createStadiumLight(x, z) {
+            const poleGeo = new THREE.CylinderGeometry(0.2, 0.2, 15);
+            const poleMat = new THREE.MeshLambertMaterial({color: 0x555555});
+            const pole = new THREE.Mesh(poleGeo, poleMat);
+            pole.position.set(x, 7.5, z);
+            scene.add(pole);
+            
+            const headGeo = new THREE.BoxGeometry(2, 1, 1);
+            const headMat = new THREE.MeshBasicMaterial({color: 0xffffee});
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.set(x, 15, z);
+            head.lookAt(0,0,CONFIG.goalZ);
+            scene.add(head);
 
-        const ringGeo = new THREE.RingGeometry(0.5, 0.6, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
-        const kickZone = new THREE.Mesh(ringGeo, ringMat);
-        kickZone.rotation.x = -Math.PI / 2;
-        kickZone.position.set(0, 0.05, -2);
-        scene.add(kickZone);
+            // Fake Glow
+            const spriteMat = new THREE.SpriteMaterial({ 
+                color: 0xffffee, 
+                transparent: true, opacity: 0.3,
+                blending: THREE.AdditiveBlending
+            });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(8,8,1);
+            head.add(sprite);
+        }
+        createStadiumLight(-15, -5);
+        createStadiumLight(15, -5);
+        createStadiumLight(-15, -30);
+        createStadiumLight(15, -30);
+
+        // Ground with stripes
+        const groundGroup = new THREE.Group();
+        const grassGeo = new THREE.PlaneGeometry(100, 100);
+        const grassMat1 = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 1 });
+        const grassMat2 = new THREE.MeshStandardMaterial({ color: 0x27ae60, roughness: 1 });
+        
+        // Base ground
+        const baseGround = new THREE.Mesh(grassGeo, grassMat1);
+        baseGround.rotation.x = -Math.PI / 2;
+        baseGround.receiveShadow = true;
+        groundGroup.add(baseGround);
+
+        // Stripes
+        for(let i=0; i<20; i++) {
+            const stripe = new THREE.Mesh(new THREE.PlaneGeometry(100, 5), grassMat2);
+            stripe.rotation.x = -Math.PI / 2;
+            stripe.position.y = 0.01;
+            stripe.position.z = -50 + (i * 10);
+            stripe.receiveShadow = true;
+            groundGroup.add(stripe);
+        }
+        scene.add(groundGroup);
 
         // Goal
         function createGoal() {
             const goalGroup = new THREE.Group();
-            const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
             const postGeo = new THREE.CylinderGeometry(0.15, 0.15, CONFIG.goalHeight);
             
             const leftPost = new THREE.Mesh(postGeo, postMat);
             leftPost.position.set(-CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
+            leftPost.castShadow = true;
             
             const rightPost = new THREE.Mesh(postGeo, postMat);
             rightPost.position.set(CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
+            rightPost.castShadow = true;
             
             const crossBarGeo = new THREE.CylinderGeometry(0.15, 0.15, CONFIG.goalWidth);
             const crossBar = new THREE.Mesh(crossBarGeo, postMat);
             crossBar.rotation.z = Math.PI / 2;
             crossBar.position.set(0, CONFIG.goalHeight, 0);
+            crossBar.castShadow = true;
 
-            const netGeo = new THREE.PlaneGeometry(CONFIG.goalWidth, CONFIG.goalHeight);
-            const netMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, side: THREE.DoubleSide, wireframe: true, transparent: true, opacity: 0.3 });
+            const netGeo = new THREE.BoxGeometry(CONFIG.goalWidth, CONFIG.goalHeight, 2);
+            // Wireframe net
+            const netMat = new THREE.MeshBasicMaterial({ color: 0xcccccc, wireframe: true, transparent: true, opacity: 0.2 });
             const net = new THREE.Mesh(netGeo, netMat);
             net.position.set(0, CONFIG.goalHeight/2, 1);
 
             goalGroup.add(leftPost, rightPost, crossBar, net);
             goalGroup.position.z = CONFIG.goalZ; 
             scene.add(goalGroup);
+            return goalGroup;
         }
-        createGoal();
+        const goal = createGoal();
+
+        // --- NEW: Goalkeeper ---
+        const keeperGroup = new THREE.Group();
+        const keeperBodyGeo = new THREE.BoxGeometry(1.2, 2.5, 0.5);
+        const keeperMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
+        const keeperBody = new THREE.Mesh(keeperBodyGeo, keeperMat);
+        keeperBody.position.y = 1.25;
+        keeperBody.castShadow = true;
+        keeperGroup.add(keeperBody);
+        
+        // Arms
+        const armGeo = new THREE.BoxGeometry(0.3, 1.2, 0.3);
+        const leftArm = new THREE.Mesh(armGeo, keeperMat); leftArm.position.set(-0.8, 1.8, 0); leftArm.rotation.z = 0.5;
+        const rightArm = new THREE.Mesh(armGeo, keeperMat); rightArm.position.set(0.8, 1.8, 0); rightArm.rotation.z = -0.5;
+        keeperGroup.add(leftArm, rightArm);
+
+        keeperGroup.position.set(0, 0, CONFIG.goalZ + 1);
+        scene.add(keeperGroup);
+
+        // --- NEW: Defensive Wall ---
+        const wallGroup = new THREE.Group();
+        const dummyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.8, 16);
+        const dummyMat = new THREE.MeshStandardMaterial({ color: 0x34495e }); // Dark blue uniforms
+        
+        // Create 3 defenders
+        [-0.8, 0, 0.8].forEach(x => {
+            const dummy = new THREE.Mesh(dummyGeo, dummyMat);
+            dummy.position.set(x, 0.9, 0);
+            dummy.castShadow = true;
+            
+            // Head
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color: 0xf1c40f}));
+            head.position.y = 1.1;
+            dummy.add(head);
+            
+            wallGroup.add(dummy);
+        });
+        wallGroup.position.set(-2, 0, CONFIG.wallZ); // Placed slightly left to force a curve
+        scene.add(wallGroup);
+
 
         // Ball
         const ballGeo = new THREE.SphereGeometry(0.4, 32, 32);
@@ -243,22 +400,114 @@
         const d3=new THREE.Mesh(dotGeo,dotMat); d3.position.set(0,0.35,0); ball.add(d3);
         scene.add(ball);
 
-        // Feet Visuals - UPDATED FOR VISIBILITY
-        // depthTest: false ensures they are always drawn ON TOP of the ball
+        // Kick Zone Ring
+        const ringGeo = new THREE.RingGeometry(0.5, 0.6, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
+        const kickZone = new THREE.Mesh(ringGeo, ringMat);
+        kickZone.rotation.x = -Math.PI / 2;
+        kickZone.position.set(0, 0.05, -2);
+        scene.add(kickZone);
+
+        // --- NEW: Trail Renderer ---
+        const trailSize = 40;
+        const trailGeo = new THREE.BufferGeometry();
+        const trailPos = new Float32Array(trailSize * 3);
+        trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
+        const trailMat = new THREE.LineBasicMaterial({ color: 0x3498db, opacity: 0.5, transparent: true, linewidth: 2 });
+        const trailLine = new THREE.Line(trailGeo, trailMat);
+        scene.add(trailLine);
+        trailLine.frustumCulled = false;
+
+        function updateTrail() {
+            if(state.ballState === 'FLYING') {
+                // Shift positions
+                const positions = trailLine.geometry.attributes.position.array;
+                for(let i = trailSize - 1; i > 0; i--) {
+                    positions[i * 3] = positions[(i - 1) * 3];
+                    positions[i * 3 + 1] = positions[(i - 1) * 3 + 1];
+                    positions[i * 3 + 2] = positions[(i - 1) * 3 + 2];
+                }
+                // Set head
+                positions[0] = ball.position.x;
+                positions[1] = ball.position.y;
+                positions[2] = ball.position.z;
+                trailLine.geometry.attributes.position.needsUpdate = true;
+                trailLine.visible = true;
+            } else {
+                trailLine.visible = false;
+            }
+        }
+
+        // --- NEW: Particles (Confetti) ---
+        const particleCount = 100;
+        const particlesGeo = new THREE.BufferGeometry();
+        const pPos = new Float32Array(particleCount * 3);
+        const pVel = []; // Custom velocity array
+        const pCols = new Float32Array(particleCount * 3);
+        
+        for(let i=0; i<particleCount; i++) {
+            pVel.push({x:0, y:0, z:0, active: false});
+            // Random colors
+            const c = new THREE.Color().setHSL(Math.random(), 1.0, 0.5);
+            pCols[i*3] = c.r; pCols[i*3+1] = c.g; pCols[i*3+2] = c.b;
+        }
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+        particlesGeo.setAttribute('color', new THREE.BufferAttribute(pCols, 3));
+        
+        const particlesMat = new THREE.PointsMaterial({ size: 0.3, vertexColors: true, transparent: true });
+        const particleSystem = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(particleSystem);
+        
+        function explodeParticles(x, y, z) {
+            const positions = particleSystem.geometry.attributes.position.array;
+            for(let i=0; i<particleCount; i++) {
+                positions[i*3] = x;
+                positions[i*3+1] = y;
+                positions[i*3+2] = z;
+                
+                // Explode outwards
+                pVel[i].x = (Math.random() - 0.5) * 0.5;
+                pVel[i].y = (Math.random() * 0.5) + 0.2; // Upwards
+                pVel[i].z = (Math.random() - 0.5) * 0.5;
+                pVel[i].active = true;
+            }
+            particleSystem.visible = true;
+        }
+
+        function updateParticles() {
+            if(!particleSystem.visible) return;
+            
+            const positions = particleSystem.geometry.attributes.position.array;
+            let activeCount = 0;
+            
+            for(let i=0; i<particleCount; i++) {
+                if(pVel[i].active) {
+                    activeCount++;
+                    // Gravity
+                    pVel[i].y -= 0.01;
+                    
+                    positions[i*3] += pVel[i].x;
+                    positions[i*3+1] += pVel[i].y;
+                    positions[i*3+2] += pVel[i].z;
+                    
+                    if(positions[i*3+1] < 0) pVel[i].active = false;
+                }
+            }
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+            if(activeCount === 0) particleSystem.visible = false;
+        }
+        particleSystem.visible = false;
+
+        // Feet Visuals
         const footGeo = new THREE.SphereGeometry(0.25, 16, 16);
         const footMatL = new THREE.MeshBasicMaterial({ color: 0xe74c3c, transparent: true, opacity: 0.8, depthTest: false });
         const footMatR = new THREE.MeshBasicMaterial({ color: 0x3498db, transparent: true, opacity: 0.8, depthTest: false });
-        
         const leftFootMesh = new THREE.Mesh(footGeo, footMatL);
         const rightFootMesh = new THREE.Mesh(footGeo, footMatR);
-        
-        // Ensure they render on top
         leftFootMesh.renderOrder = 999;
         rightFootMesh.renderOrder = 999;
-
         scene.add(leftFootMesh);
         scene.add(rightFootMesh);
-        
         leftFootMesh.visible = false;
         rightFootMesh.visible = false;
 
@@ -271,6 +520,9 @@
             document.getElementById('p-meter-cont').style.display = 'none';
             kickZone.material.opacity = 0.6;
             kickZone.scale.set(1,1,1);
+            
+            // Randomize Wall Position slightly
+            wallGroup.position.x = (Math.random() * 4) - 2;
         }
         resetBall();
 
@@ -279,20 +531,24 @@
         function triggerKick(speed, footX, swingVelocityX) {
             if(state.ballState !== 'IDLE') return;
 
+            AudioSys.playKick();
             state.ballState = 'FLYING';
             kickZone.material.opacity = 0; 
             state.ballSafetyTimer = setTimeout(resetBall, 4000);
 
-            const power = Math.min(speed, 15);
+            // Init Trail
+            const positions = trailLine.geometry.attributes.position.array;
+            for(let i=0; i<trailSize*3; i++) positions[i] = ball.position.x; // simple clear
+
+            const power = Math.min(speed, 18); // Slightly higher max speed
             
-            // Direction Logic
+            // Curve Logic
             const swingDir = swingVelocityX * 0.4;
             const impactOffset = (footX - ball.position.x) * -2.0; 
-            
-            const curve = (swingDir + impactOffset) * 0.5;
+            const curve = (swingDir + impactOffset) * 0.6;
             
             const lift = Math.min(power * 0.1, 0.9); 
-            const fwd = Math.min(power * 0.25, 2.2); 
+            const fwd = Math.min(power * 0.28, 2.5); // Faster ball
 
             state.velocity.set(curve, lift, -fwd);
 
@@ -304,8 +560,8 @@
             const aimArrow = document.getElementById('aim-arrow');
             feedbackText.innerText = speedKm > 100 ? "ROCKET!" : "KICK!";
             
-            if(curve < -0.4) aimArrow.innerText = "⬅ Left";
-            else if(curve > 0.4) aimArrow.innerText = "Right ➡";
+            if(curve < -0.4) aimArrow.innerText = "⬅ Curve Left";
+            else if(curve > 0.4) aimArrow.innerText = "Curve Right ➡";
             else aimArrow.innerText = "⬆ Center";
             
             const fbContainer = document.getElementById('kick-feedback');
@@ -317,35 +573,89 @@
             bar.style.width = Math.min((speedKm / 120) * 100, 100) + "%";
         }
 
+        function checkCollision(pos, radius, obstaclePos, obstacleW, obstacleH, obstacleD) {
+            // Simple AABB vs Sphere check
+            const dx = Math.abs(pos.x - obstaclePos.x);
+            const dy = Math.abs(pos.y - obstaclePos.y);
+            const dz = Math.abs(pos.z - obstaclePos.z);
+
+            if (dx > (obstacleW/2 + radius)) return false;
+            if (dy > (obstacleH/2 + radius)) return false;
+            if (dz > (obstacleD/2 + radius)) return false;
+
+            return true;
+        }
+
         function updateBall() {
             if(state.ballState === 'FLYING') {
                 state.velocity.y -= 0.025; // Gravity
-                state.velocity.z *= 0.99;  // Drag
+                state.velocity.z *= 0.995;  // Drag
 
-                const prevZ = ball.position.z;
+                const prevPos = ball.position.clone();
                 ball.position.add(state.velocity);
-                const currZ = ball.position.z;
-
+                
                 ball.rotation.x -= state.velocity.z * 0.2; 
                 ball.rotation.z -= state.velocity.x * 0.2; 
 
+                // Ground Bounce
                 if(ball.position.y < 0.4) {
                     ball.position.y = 0.4;
                     state.velocity.y *= -0.6;
+                    state.velocity.z *= 0.8;
                 }
 
-                if(prevZ >= CONFIG.goalZ && currZ <= CONFIG.goalZ) {
+                // 1. Check Wall Collision
+                // Wall group position + local dummy positions
+                // Simplified: Check against the bounding box of the whole wall group
+                // Group Pos: wallGroup.position.x, y=0, z=CONFIG.wallZ
+                // Dummies are approx +/- 0.8 width total approx 2.5
+                if(ball.position.z < (CONFIG.wallZ + 0.5) && ball.position.z > (CONFIG.wallZ - 0.5)) {
+                    // Check Width
+                    const distToWallCenter = Math.abs(ball.position.x - wallGroup.position.x);
+                    if(distToWallCenter < 1.5 && ball.position.y < 2.0) {
+                        // Hit Wall
+                        state.velocity.z *= -0.5; // Bounce back
+                        state.velocity.y += 0.2;
+                        AudioSys.playHit();
+                        document.getElementById('feedback-text').innerText = "BLOCKED!";
+                        document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(1)";
+                    }
+                }
+
+                // 2. Check Keeper Collision
+                // Keeper moves on X at z = goalZ + 1
+                const kx = keeperGroup.position.x;
+                const ky = keeperGroup.position.y;
+                const kz = keeperGroup.position.z;
+                
+                const dx = Math.abs(ball.position.x - kx);
+                const dy = Math.abs(ball.position.y - ky);
+                const dz = Math.abs(ball.position.z - kz);
+                
+                if(dz < 0.8 && dx < 1.0 && dy < 1.5) {
+                    // Save!
+                    state.velocity.z *= -0.5;
+                    state.velocity.x += (Math.random()-0.5);
+                    AudioSys.playHit();
+                    document.getElementById('feedback-text').innerText = "SAVED!";
+                    document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(1)";
+                }
+
+                // 3. Goal Check
+                if(prevPos.z >= CONFIG.goalZ && ball.position.z <= CONFIG.goalZ) {
                     if(Math.abs(ball.position.x) < CONFIG.goalWidth/2 && ball.position.y < CONFIG.goalHeight) {
                         scoreGoal();
                     }
                 }
 
+                // Reset logic
                 if(ball.position.z < -40 || Math.abs(ball.position.x) > 25) {
                     state.ballState = 'RESETTING';
                     clearTimeout(state.ballSafetyTimer);
                     setTimeout(resetBall, 800);
                 }
             } else {
+                // Idle animation
                 const s = 1 + Math.sin(Date.now() * 0.005) * 0.1;
                 kickZone.scale.set(s, s, 1);
             }
@@ -357,6 +667,9 @@
             state.ballState = 'RESETTING';
             clearTimeout(state.ballSafetyTimer);
             
+            AudioSys.playGoal();
+            explodeParticles(ball.position.x, ball.position.y, ball.position.z);
+
             const fb = document.getElementById('feedback-text');
             fb.innerText = "GOAL!!!";
             document.getElementById('aim-arrow').innerText = "⚽";
@@ -365,7 +678,29 @@
             setTimeout(() => {
                 document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
                 resetBall();
-            }, 2000);
+            }, 2500);
+        }
+
+        // --- Keeper AI ---
+        function updateKeeper() {
+            if(state.ballState === 'FLYING') {
+                // React to ball
+                if(ball.position.z < -5) {
+                    // Move towards ball x
+                    const targetX = Math.max(-CONFIG.goalWidth/2 + 1, Math.min(CONFIG.goalWidth/2 - 1, ball.position.x));
+                    // Lerp
+                    keeperGroup.position.x += (targetX - keeperGroup.position.x) * 0.15;
+                    
+                    // Jump if ball is high
+                    if(ball.position.y > 2 && keeperGroup.position.y < 2) {
+                         keeperGroup.position.y += 0.2;
+                    }
+                }
+            } else {
+                // Idle weave
+                keeperGroup.position.x = Math.sin(Date.now() * 0.002) * 3;
+                keeperGroup.position.y = 0;
+            }
         }
 
         // --- STABILIZED TRACKING ---
@@ -374,17 +709,14 @@
             if(state.phase !== 'PLAYING') return;
 
             const scale = Math.max(state.playerScale, CONFIG.minScale);
-            
-            // X-AXIS FIX: We now multiply by -1.0
-            // Because camera is mirrored (CSS), we must invert tracking coordinate to match.
+            // Inverted X due to mirror
             const relX = (landmark.x - state.hipCenter.x) / scale * -1.0; 
             const relY = (landmark.y - state.hipCenter.y) / scale; 
 
-            // Map to World Coordinates
+            // Map to World
             const targetX = relX * 4.0; 
             const targetY = (relY * -4.0) + 2.5; 
 
-            // Smoothing
             const smoothFactor = 0.5;
             const newX = footState.x + (targetX - footState.x) * smoothFactor;
             const newY = footState.y + (targetY - footState.y) * smoothFactor;
@@ -400,7 +732,6 @@
 
             mesh.position.x = newX;
             mesh.position.y = newY;
-            // Z Fix: Move feet slightly closer to camera than ball (-2.0)
             mesh.position.z = -1.5; 
 
             if(landmark.visibility > 0.6) {
@@ -424,13 +755,16 @@
             
             let count = 3;
             countTxt.innerText = count;
+            AudioSys.playTone(400, 'sine', 0.1);
 
             const interval = setInterval(() => {
                 count--;
                 if(count > 0) {
                     countTxt.innerText = count;
+                    AudioSys.playTone(400, 'sine', 0.1);
                 } else if(count === 0) {
                     countTxt.innerText = "GO!";
+                    AudioSys.playTone(800, 'square', 0.3);
                 } else {
                     clearInterval(interval);
                     document.getElementById('setup-overlay').style.display = 'none';
@@ -506,6 +840,10 @@
 
         const startBtn = document.getElementById('start-btn');
         startBtn.addEventListener('click', () => {
+            // Audio Context must be resumed on user gesture
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            state.audioEnabled = true;
+
             cameraUtils.start().then(() => {
                 document.getElementById('start-screen').classList.add('hidden');
                 document.getElementById('setup-overlay').style.display = 'block';
@@ -516,12 +854,15 @@
 
         setTimeout(() => {
             startBtn.disabled = false;
-            startBtn.innerText = "ENABLE CAMERA";
+            startBtn.innerText = "PLAY";
         }, 1000);
 
         function animate() {
             requestAnimationFrame(animate);
             updateBall();
+            updateKeeper();
+            updateTrail();
+            updateParticles();
             renderer.render(scene, camera);
         }
         animate();
