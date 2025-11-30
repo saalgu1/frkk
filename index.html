@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>AR Free Kick - Adaptive Tracking</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #2c3e50;
+            font-family: 'Teko', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #game-container {
+            position: absolute;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 1;
+        }
+
+        #input-video {
+            position: absolute; top: 0; left: 0;
+            width: 320px; height: 240px;
+            transform: scaleX(-1);
+            opacity: 0; pointer-events: none; z-index: 0;
+        }
+
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; pointer-events: none;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+
+        .hud-top {
+            padding: 20px;
+            display: flex; justify-content: space-between;
+            color: white; text-transform: uppercase;
+        }
+
+        .score-box {
+            background: rgba(0,0,0,0.6);
+            padding: 10px 20px;
+            border-left: 5px solid #2ecc71;
+            font-size: 30px;
+            letter-spacing: 2px;
+        }
+
+        .power-meter-container {
+            width: 200px; height: 20px;
+            background: rgba(0,0,0,0.5);
+            margin-top: 5px;
+            border: 1px solid white;
+            display: none; 
+        }
+        .power-bar {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, #f1c40f, #e74c3c);
+            transition: width 0.1s;
+        }
+
+        .center-card {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 30px;
+            border-radius: 4px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            pointer-events: auto;
+            width: 90%; max-width: 400px;
+        }
+
+        .hidden { opacity: 0; pointer-events: none; transform: translate(-50%, -60%) scale(0.9); transition: all 0.3s; }
+
+        h1 { margin: 0; color: #2c3e50; font-size: 48px; line-height: 1; }
+        p { font-family: sans-serif; color: #7f8c8d; margin-bottom: 20px; }
+
+        .instruction-icon { font-size: 40px; margin: 10px 0; }
+
+        button {
+            background: #e74c3c; color: white;
+            border: none; padding: 15px 40px;
+            font-size: 24px; font-family: 'Teko', sans-serif;
+            cursor: pointer; text-transform: uppercase;
+            letter-spacing: 1px; width: 100%;
+            transition: background 0.2s;
+        }
+        button:active { transform: translateY(2px); }
+        button:disabled { background: #95a5a6; cursor: wait; }
+
+        #kick-feedback {
+            position: absolute;
+            top: 40%; left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 80px;
+            color: #f1c40f;
+            text-shadow: 4px 4px 0 #c0392b;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        #cam-status {
+            font-family: sans-serif; font-size: 12px; color: #aaa; margin-top: 10px;
+        }
+        
+        #debug-info {
+            position: absolute; bottom: 10px; left: 10px;
+            color: rgba(255,255,255,0.5); font-family: monospace; font-size: 12px;
+            text-align: left;
+        }
+
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <video id="input-video" playsinline></video>
+    <div id="game-container"></div>
+    <div id="kick-feedback">POWER SHOT!</div>
+
+    <div id="ui-layer">
+        <div class="hud-top">
+            <div>
+                <div class="score-box">GOALS: <span id="score-val">0</span></div>
+                <div class="power-meter-container" id="p-meter-cont">
+                    <div class="power-bar" id="p-bar"></div>
+                </div>
+            </div>
+            <div class="score-box" style="border-left:none; border-right: 5px solid #3498db">
+                SPEED: <span id="speed-val">0</span> km/h
+            </div>
+        </div>
+
+        <div id="start-screen" class="center-card">
+            <h1>FREE KICK PRO</h1>
+            <div class="instruction-icon">🦶 📷</div>
+            <p><strong>Setup:</strong> Place device on floor.<br>Step back until your <strong>entire body</strong> is visible.</p>
+            <button id="start-btn" disabled>Loading AI...</button>
+            <div id="cam-status">Initializing Camera...</div>
+        </div>
+        
+        <div id="debug-info">Waiting for player...</div>
+    </div>
+
+    <script>
+        /**
+         * FREE KICK PRO - ADAPTIVE TRACKING
+         * Fixes: Normalized velocity based on player scale (shoulder width)
+         */
+
+        const CONFIG = {
+            // Lower threshold because we now use normalized speed
+            kickThreshold: 3.5, 
+            goalWidth: 14,
+            goalHeight: 7
+        };
+
+        let state = {
+            isPlaying: false,
+            score: 0,
+            ballState: 'IDLE',
+            velocity: new THREE.Vector3(),
+            // Tracking history
+            leftFootHist: [],
+            rightFootHist: [],
+            playerScale: 1.0, // Scale factor (shoulder width)
+            hipCenter: {x: 0.5, y: 0.5}
+        };
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('game-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 15, 80);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+        camera.position.set(0, 2, 7); 
+        camera.lookAt(0, 0.5, -5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
+        scene.add(hemiLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(-5, 10, 5);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- World Objects ---
+        
+        // Grass
+        const grassGeo = new THREE.PlaneGeometry(200, 200);
+        const grassMat = new THREE.MeshStandardMaterial({ color: 0x27ae60, roughness: 1 });
+        const ground = new THREE.Mesh(grassGeo, grassMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Kick Zone Indicator (The Ring)
+        const ringGeo = new THREE.RingGeometry(0.5, 0.6, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
+        const kickZone = new THREE.Mesh(ringGeo, ringMat);
+        kickZone.rotation.x = -Math.PI / 2;
+        kickZone.position.set(0, 0.05, -2);
+        scene.add(kickZone);
+
+        // Goal
+        function createGoal() {
+            const goalGroup = new THREE.Group();
+            const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            const postGeo = new THREE.CylinderGeometry(0.15, 0.15, CONFIG.goalHeight);
+            
+            const leftPost = new THREE.Mesh(postGeo, postMat);
+            leftPost.position.set(-CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
+            
+            const rightPost = new THREE.Mesh(postGeo, postMat);
+            rightPost.position.set(CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
+            
+            const crossBarGeo = new THREE.CylinderGeometry(0.15, 0.15, CONFIG.goalWidth);
+            const crossBar = new THREE.Mesh(crossBarGeo, postMat);
+            crossBar.rotation.z = Math.PI / 2;
+            crossBar.position.set(0, CONFIG.goalHeight, 0);
+
+            const netGeo = new THREE.PlaneGeometry(CONFIG.goalWidth, CONFIG.goalHeight);
+            const netMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, side: THREE.DoubleSide, wireframe: true, transparent: true, opacity: 0.3 });
+            const net = new THREE.Mesh(netGeo, netMat);
+            net.position.set(0, CONFIG.goalHeight/2, 1);
+
+            goalGroup.add(leftPost, rightPost, crossBar, net);
+            goalGroup.position.z = -18; 
+            scene.add(goalGroup);
+        }
+        createGoal();
+
+        // Ball
+        const ballGeo = new THREE.SphereGeometry(0.4, 32, 32);
+        const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+        const ball = new THREE.Mesh(ballGeo, ballMat);
+        ball.castShadow = true;
+        
+        // Decals for ball rotation visibility
+        const dotGeo = new THREE.SphereGeometry(0.15, 8, 8);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0x2c3e50 });
+        const d1=new THREE.Mesh(dotGeo,dotMat); d1.position.set(0.35,0,0); ball.add(d1);
+        const d2=new THREE.Mesh(dotGeo,dotMat); d2.position.set(-0.35,0,0); ball.add(d2);
+        const d3=new THREE.Mesh(dotGeo,dotMat); d3.position.set(0,0.35,0); ball.add(d3);
+
+        scene.add(ball);
+
+        // Virtual Feet (Visual Feedback)
+        const footGeo = new THREE.SphereGeometry(0.25, 16, 16);
+        const footMatL = new THREE.MeshBasicMaterial({ color: 0xe74c3c, transparent: true, opacity: 0.6 });
+        const footMatR = new THREE.MeshBasicMaterial({ color: 0x3498db, transparent: true, opacity: 0.6 });
+        
+        const leftFootMesh = new THREE.Mesh(footGeo, footMatL);
+        const rightFootMesh = new THREE.Mesh(footGeo, footMatR);
+        scene.add(leftFootMesh);
+        scene.add(rightFootMesh);
+
+        function resetBall() {
+            ball.position.set(0, 0.4, -2);
+            ball.rotation.set(0,0,0);
+            state.velocity.set(0,0,0);
+            state.ballState = 'IDLE';
+            document.getElementById('p-meter-cont').style.display = 'none';
+            kickZone.material.opacity = 0.6;
+        }
+        resetBall();
+
+        // --- Logic ---
+
+        function triggerKick(power, sideX) {
+            if(state.ballState !== 'IDLE') return;
+
+            state.ballState = 'FLYING';
+            kickZone.material.opacity = 0; // Hide zone on kick
+
+            // Physics calculation
+            // Power is now Normalized (approx 0 to 20 range)
+            
+            // Cap power for gameplay balance
+            const effectivePower = Math.min(power, 25);
+            
+            const lift = Math.min(effectivePower * 0.08, 0.8); 
+            const fwd = Math.min(effectivePower * 0.2, 1.8); 
+            
+            // Curve logic: Striking left of center curves ball right
+            const curve = sideX * 0.4;
+
+            state.velocity.set(curve, lift, -fwd);
+
+            // UI
+            const speedKm = Math.round(effectivePower * 8); 
+            document.getElementById('speed-val').innerText = speedKm;
+            
+            const feedback = document.getElementById('kick-feedback');
+            feedback.innerText = speedKm > 100 ? "ROCKET!" : (speedKm > 60 ? "POWER SHOT!" : "KICK!");
+            feedback.style.transform = "translate(-50%, -50%) scale(1)";
+            setTimeout(() => { feedback.style.transform = "translate(-50%, -50%) scale(0)"; }, 1000);
+
+            const bar = document.getElementById('p-bar');
+            document.getElementById('p-meter-cont').style.display = 'block';
+            bar.style.width = Math.min((speedKm / 120) * 100, 100) + "%";
+        }
+
+        function updateBall() {
+            if(state.ballState === 'FLYING') {
+                state.velocity.y -= 0.025; // Gravity
+                state.velocity.z *= 0.995; // Drag
+
+                ball.position.add(state.velocity);
+                ball.rotation.x -= state.velocity.z * 0.2; // Spin
+
+                // Floor bounce
+                if(ball.position.y < 0.4) {
+                    ball.position.y = 0.4;
+                    state.velocity.y *= -0.6;
+                    state.velocity.z *= 0.85;
+                }
+
+                // Goal logic
+                if(ball.position.z < -18 && ball.position.z > -19) {
+                    if(Math.abs(ball.position.x) < CONFIG.goalWidth/2 && ball.position.y < CONFIG.goalHeight) {
+                        state.score++;
+                        document.getElementById('score-val').innerText = state.score;
+                        state.ballState = 'RESETTING';
+                        
+                        const fb = document.getElementById('kick-feedback');
+                        fb.innerText = "GOAL!!!";
+                        fb.style.color = "#2ecc71";
+                        fb.style.transform = "translate(-50%, -50%) scale(1)";
+                        
+                        setTimeout(() => {
+                            fb.style.transform = "translate(-50%, -50%) scale(0)";
+                            fb.style.color = "#f1c40f";
+                            resetBall();
+                        }, 2000);
+                    }
+                }
+
+                if(ball.position.z < -40) {
+                    state.ballState = 'RESETTING';
+                    setTimeout(resetBall, 1000);
+                }
+            } else {
+                // Idle pulse
+                const s = 1 + Math.sin(Date.now() * 0.005) * 0.1;
+                kickZone.scale.set(s, s, 1);
+            }
+        }
+
+        // --- IMPROVED TRACKING LOGIC ---
+
+        function updateFootTracking(landmark, history, mesh, isLeft) {
+            const now = performance.now();
+            
+            // 1. Calculate Player Scale (Shoulder Width)
+            // This is crucial. If player is far, scale is small. We divide movement by scale.
+            // A small movement far away becomes a big normalized movement.
+            const scale = Math.max(state.playerScale, 0.05); // Prevent div by zero
+
+            // 2. Relative Position
+            // Instead of raw X, use X relative to Hip Center
+            const relX = (landmark.x - state.hipCenter.x) / scale; 
+            const relY = (landmark.y - state.hipCenter.y) / scale; // Y is height relative to hip
+
+            // 3. Map to 3D World for Rendering
+            // The mapping factor '3.5' is tuned to make 'hip-width' steps feel 1:1 with world meters
+            const mapX = relX * 3.5; 
+            // For Y (height), we want floor to be roughly 1.5 units below hip
+            const mapY = (relY * -3.5) + 2.0; 
+
+            // Interpolate for smoothness
+            mesh.position.x += (mapX - mesh.position.x) * 0.3;
+            mesh.position.y += (mapY - mesh.position.y) * 0.3;
+            mesh.position.z = -1.8; // Align with ball plane
+
+            // 4. Velocity Calculation
+            history.push({x: mapX, y: mapY, t: now});
+            if(history.length > 4) history.shift();
+
+            if(history.length >= 2) {
+                const recent = history[history.length-1];
+                const old = history[0];
+                const dt = (recent.t - old.t) / 1000;
+                
+                if(dt > 0.01) {
+                    const dist = Math.sqrt(Math.pow(recent.x - old.x, 2) + Math.pow(recent.y - old.y, 2));
+                    const speed = dist / dt; // Normalized Speed (Units per second)
+
+                    // 5. Collision Check (Intersection with Kick Zone)
+                    const ballDist = Math.abs(mesh.position.x - ball.position.x); // X offset
+                    const heightDiff = Math.abs(mesh.position.y - ball.position.y); // Y offset
+                    
+                    // Trigger if:
+                    // 1. Speed is high enough
+                    // 2. Foot is horizontally close to ball
+                    // 3. Foot is vertically close to floor (y < 0.8)
+                    if(speed > CONFIG.kickThreshold && ballDist < 0.8 && mesh.position.y < 0.8) {
+                        triggerKick(speed, mesh.position.x);
+                    }
+                }
+            }
+        }
+
+        function onResults(results) {
+            if (!results.poseLandmarks) return;
+
+            const lm = results.poseLandmarks;
+            const leftShoulder = lm[11];
+            const rightShoulder = lm[12];
+            const leftHip = lm[23];
+            const rightHip = lm[24];
+
+            // Update Global Body State
+            // Calculate scale based on shoulder width
+            const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+            // Smooth the scale to prevent jitter
+            state.playerScale = (state.playerScale * 0.9) + (shoulderWidth * 0.1);
+            
+            // Calculate Hip Center
+            const hipCX = (leftHip.x + rightHip.x) / 2;
+            const hipCY = (leftHip.y + rightHip.y) / 2;
+            state.hipCenter.x = (state.hipCenter.x * 0.8) + (hipCX * 0.2);
+            state.hipCenter.y = (state.hipCenter.y * 0.8) + (hipCY * 0.2);
+
+            // Debug Info
+            document.getElementById('debug-info').innerText = 
+                `Scale: ${state.playerScale.toFixed(3)} | Visibility: ${lm[27].visibility.toFixed(2)}`;
+
+            // Track Feet
+            // 27 = Left Ankle, 28 = Right Ankle
+            if(lm[27].visibility > 0.5) updateFootTracking(lm[27], state.leftFootHist, leftFootMesh, true);
+            if(lm[28].visibility > 0.5) updateFootTracking(lm[28], state.rightFootHist, rightFootMesh, false);
+            
+            // Update UI status
+            const status = document.getElementById('cam-status');
+            if(lm[27].visibility > 0.5 || lm[28].visibility > 0.5) {
+                status.innerText = "PLAYER DETECTED";
+                status.style.color = "#2ecc71";
+            } else {
+                status.innerText = "Step back to show feet";
+                status.style.color = "#e74c3c";
+            }
+        }
+
+        // --- Init ---
+        const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        pose.onResults(onResults);
+
+        const videoElement = document.getElementById('input-video');
+        const cameraUtils = new Camera(videoElement, {
+            onFrame: async () => { await pose.send({image: videoElement}); },
+            width: 640, height: 480
+        });
+
+        const startBtn = document.getElementById('start-btn');
+        startBtn.addEventListener('click', () => {
+            document.getElementById('start-screen').classList.add('hidden');
+            state.isPlaying = true;
+        });
+
+        cameraUtils.start().then(() => {
+            startBtn.disabled = false;
+            startBtn.innerText = "KICK OFF";
+            document.getElementById('cam-status').innerText = "Ready";
+        });
+
+        // Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            updateBall();
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
