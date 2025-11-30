@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>AR Free Kick - Pro Edition</title>
+    <title>AR Free Kick - Arcade Mode</title>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
     <style>
         body {
             margin: 0; overflow: hidden;
-            background-color: #1a1a2e; /* Darker night sky */
+            background-color: #1a1a2e;
             font-family: 'Teko', sans-serif;
             user-select: none; -webkit-user-select: none;
         }
@@ -33,35 +33,35 @@
             transition: all 0.5s;
         }
 
-        /* Scaled HUD for distance viewing */
         #ui-layer.game-active .hud-top {
-            transform: scale(1.4); /* Make top UI 40% bigger during game */
-            transform-origin: top center;
-            margin-top: 10px;
+            transform: scale(1.4); transform-origin: top center; margin-top: 10px;
         }
 
         .hud-top {
             padding: 20px; display: flex; justify-content: space-between; color: white; text-transform: uppercase;
-            text-shadow: 0 0 10px rgba(0,0,0,0.8);
-            transition: transform 0.5s;
-            width: 100%; box-sizing: border-box;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8); transition: transform 0.5s; width: 100%; box-sizing: border-box;
         }
 
         .score-box {
             background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.4)); 
-            padding: 10px 25px;
-            border-radius: 8px;
+            padding: 10px 25px; border-radius: 8px;
             border-left: 5px solid #2ecc71; font-size: 32px; letter-spacing: 2px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
 
-        .power-meter-container {
-            width: 220px; height: 24px; background: rgba(0,0,0,0.6);
-            margin-top: 8px; border: 2px solid rgba(255,255,255,0.3); border-radius: 12px; overflow: hidden;
-            display: none; 
+        /* NEW: Side Bars for Aiming Feedback */
+        #aim-hud-left, #aim-hud-right {
+            position: absolute; top: 50%; width: 20px; height: 200px;
+            background: rgba(0,0,0,0.5); border: 2px solid white; border-radius: 10px;
+            transform: translateY(-50%); display: none;
         }
-        .power-bar {
-            height: 100%; width: 0%; background: linear-gradient(90deg, #f1c40f, #e74c3c); transition: width 0.1s;
+        #aim-hud-left { left: 20px; }
+        #aim-hud-right { right: 20px; }
+        
+        .aim-indicator {
+            width: 100%; height: 20%; background: #f1c40f;
+            position: absolute; top: 50%; transition: top 0.2s;
+            box-shadow: 0 0 10px #f1c40f;
         }
 
         .center-card {
@@ -72,7 +72,7 @@
             pointer-events: auto; width: 90%; max-width: 420px;
             transition: opacity 0.3s;
             backdrop-filter: blur(10px);
-            z-index: 100; /* Ensure start screen is on top */
+            z-index: 100;
         }
 
         .hidden { opacity: 0; pointer-events: none; }
@@ -88,7 +88,6 @@
             transition: transform 0.1s, box-shadow 0.2s;
             box-shadow: 0 10px 20px rgba(231, 76, 60, 0.3);
         }
-        button:active { transform: scale(0.98); }
         button:disabled { background: #bdc3c7; cursor: wait; box-shadow: none; }
 
         #setup-overlay {
@@ -99,42 +98,19 @@
         #setup-msg { font-size: 60px; color: #f1c40f; font-weight: 600; white-space: nowrap; }
         #countdown-txt { font-size: 200px; font-weight: bold; display: none; margin-top: -20px; color: white;}
 
-        /* --- NEW: Guide Overlay (High Visibility) --- */
         #guide-reticle {
             position: absolute; top: 50%; left: 50%;
-            width: 300px; height: 550px;
+            width: 300px; height: 500px;
             transform: translate(-50%, -45%);
-            border: 8px dashed #00ffff; /* Thicker border */
-            border-radius: 30px;
-            box-sizing: border-box;
-            pointer-events: none;
-            display: none;
-            transition: all 0.3s;
-            z-index: 40; /* Above UI layer */
+            border: 8px dashed #00ffff; border-radius: 30px;
+            box-sizing: border-box; pointer-events: none;
+            display: none; transition: all 0.3s; z-index: 40;
             box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
         }
-        #guide-reticle::before {
-            content: "FRAME YOUR BODY";
-            position: absolute; top: -60px; width: 140%; left: -20%; text-align: center;
-            color: #00ffff; font-size: 42px; text-shadow: 0 2px 4px black;
-            background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px;
-        }
-        /* Dynamic Status Text inside box */
         #guide-status {
             position: absolute; bottom: 20px; width: 100%; 
             text-align: center; font-size: 48px; color: white;
             text-shadow: 0 2px 10px black; font-weight: bold;
-        }
-
-        .guide-bad { border-color: #e74c3c !important; box-shadow: 0 0 20px rgba(231, 76, 60, 0.5) !important; }
-        .guide-good { border-color: #2ecc71 !important; box-shadow: 0 0 50px rgba(46, 204, 113, 0.8) !important; background: rgba(46,204,113,0.1); }
-        
-        #warning-msg {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(231, 76, 60, 0.95); color: white; padding: 30px 60px;
-            font-size: 50px; border-radius: 20px; display: none; text-align: center;
-            border: 4px solid white; z-index: 60; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            white-space: nowrap;
         }
 
         #kick-feedback {
@@ -143,28 +119,21 @@
             font-size: 110px; color: #fff;
             text-shadow: 0 0 20px #f1c40f, 6px 6px 0 #c0392b;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: none; white-space: nowrap; text-align: center;
-            z-index: 20;
+            pointer-events: none; white-space: nowrap; text-align: center; z-index: 20;
         }
-        #aim-arrow { font-size: 60px; display: block; margin-top: 5px; color: #f1c40f; text-shadow: 2px 2px 0 #000; }
-
-        #technique-label {
-            position: absolute; bottom: 20%; left: 50%; transform: translate(-50%, 0);
-            font-size: 30px; color: #00ffff; text-shadow: 0 0 10px #00ffff;
-            opacity: 0; transition: opacity 0.5s;
-        }
-
-        #debug-info {
-            position: absolute; bottom: 10px; left: 10px;
-            color: rgba(255,255,255,0.3); font-family: monospace; font-size: 10px;
-            text-align: left;
-        }
+        #aim-arrow-txt { font-size: 60px; display: block; margin-top: 5px; color: #f1c40f; text-shadow: 2px 2px 0 #000; }
 
         #game-container::after {
             content: " ";
             display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
             background-size: 100% 4px; z-index: 2; pointer-events: none;
+        }
+        
+        #controls-hint {
+            position: absolute; bottom: 10%; width: 100%; text-align: center;
+            color: rgba(255,255,255,0.8); font-size: 24px; display: none;
+            text-shadow: 0 2px 4px black; letter-spacing: 1px;
         }
     </style>
 
@@ -179,34 +148,29 @@
     
     <div id="kick-feedback">
         <span id="feedback-text">GOAL!!!</span>
-        <div id="aim-arrow"></div>
+        <div id="aim-arrow-txt"></div>
     </div>
     
-    <div id="technique-label">INSIDE CURL</div>
-    <div id="warning-msg">STEP BACK INTO FRAME</div>
+    <div id="aim-hud-left"><div class="aim-indicator" id="aim-y-ind"></div></div>
     
-    <!-- Updated Guide Structure -->
     <div id="guide-reticle">
         <div id="guide-status">Adjusting...</div>
     </div>
 
     <div id="ui-layer">
         <div class="hud-top">
-            <div>
-                <div class="score-box">GOALS: <span id="score-val">0</span></div>
-                <div class="power-meter-container" id="p-meter-cont">
-                    <div class="power-bar" id="p-bar"></div>
-                </div>
-            </div>
+            <div class="score-box">GOALS: <span id="score-val">0</span></div>
             <div class="score-box" style="border-left:none; border-right: 5px solid #3498db">
                 SPEED: <span id="speed-val">0</span> km/h
             </div>
         </div>
 
+        <div id="controls-hint">STEP LEFT/RIGHT TO AIM &bull; SWING TO KICK</div>
+
         <div id="start-screen" class="center-card">
             <h1>FREE KICK PRO</h1>
             <p style="font-size: 60px; margin: 10px;">⚽</p>
-            <p>1. Enable Camera & Sound<br>2. Fit your body in the box<br>3. Stand to the side to Kick</p>
+            <p><strong>NEW CONTROLS:</strong><br>1. Step Side-to-Side to Aim Arrow<br>2. Step Back for High Shots<br>3. Swing Foot to Kick</p>
             <button id="start-btn" disabled>Loading Engine...</button>
         </div>
 
@@ -214,22 +178,19 @@
             <div id="setup-msg"></div>
             <div id="countdown-txt">3</div>
         </div>
-        
-        <div id="debug-info">System Ready</div>
     </div>
 
     <script>
         /**
-         * FREE KICK PRO - ULTIMATE EDITION
-         * v4: Foot Technique & Adaptive Zones
+         * FREE KICK PRO - ARCADE UPDATE
+         * Body-Based Aiming System
          */
 
         const CONFIG = {
-            kickThreshold: 2.0, 
+            kickThreshold: 2.5, // Speed required to trigger kick
             goalWidth: 14,
             goalHeight: 7,
             goalZ: -24,
-            minScale: 0.25,
             wallZ: -14,
         };
 
@@ -245,12 +206,11 @@
             setupTimer: 0,
             ballSafetyTimer: null,
             audioEnabled: false,
-            outOfBounds: false
+            aimAngle: 0,
+            aimPower: 0.5
         };
 
-        // --- AUDIO SYSTEM ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
         const AudioSys = {
             playTone: (freq, type, duration, vol = 0.1) => {
                 if(!state.audioEnabled) return;
@@ -265,20 +225,11 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + duration);
             },
-            playKick: (type) => {
-                // Different sounds for power vs finesse
-                const pitch = type === 'power' ? 60 : 120;
-                AudioSys.playTone(pitch, 'triangle', 0.2, 0.4);
-            },
-            playGoal: () => {
-                [0, 0.1, 0.2].forEach((t, i) => setTimeout(() => AudioSys.playTone(400 + (i*100), 'square', 0.4, 0.1), t*1000));
-            },
-            playHit: () => {
-                AudioSys.playTone(800, 'square', 0.1, 0.1);
-            }
+            playKick: () => AudioSys.playTone(60, 'triangle', 0.2, 0.4),
+            playGoal: () => [0, 0.1, 0.2].forEach((t, i) => setTimeout(() => AudioSys.playTone(400 + (i*100), 'square', 0.4, 0.1), t*1000)),
+            playHit: () => AudioSys.playTone(800, 'square', 0.1, 0.1)
         };
 
-        // --- Three.js Setup ---
         const container = document.getElementById('game-container');
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a2e);
@@ -287,9 +238,7 @@
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
         const defaultCamPos = new THREE.Vector3(0, 1.4, 3.5); 
         const defaultLookAt = new THREE.Vector3(0, 0.6, -8);
-        const setupCamPos = new THREE.Vector3(0, 2, 7);
-        
-        camera.position.copy(setupCamPos);
+        camera.position.set(0, 2, 7);
         camera.lookAt(0, 0.5, -5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -300,171 +249,85 @@
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
         scene.add(ambientLight);
-        
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
         dirLight.position.set(-10, 20, 10);
         dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 2048;
-        dirLight.shadow.mapSize.height = 2048;
         scene.add(dirLight);
 
         // --- ASSETS ---
-        function createStadiumLight(x, z) {
-            const poleGeo = new THREE.CylinderGeometry(0.2, 0.2, 15);
-            const poleMat = new THREE.MeshLambertMaterial({color: 0x555555});
-            const pole = new THREE.Mesh(poleGeo, poleMat);
-            pole.position.set(x, 7.5, z);
-            scene.add(pole);
-            const headGeo = new THREE.BoxGeometry(2, 1, 1);
-            const headMat = new THREE.MeshBasicMaterial({color: 0xffffee});
-            const head = new THREE.Mesh(headGeo, headMat);
-            head.position.set(x, 15, z);
-            head.lookAt(0,0,CONFIG.goalZ);
-            scene.add(head);
-            const spriteMat = new THREE.SpriteMaterial({ 
-                color: 0xffffee, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending
-            });
-            const sprite = new THREE.Sprite(spriteMat);
-            sprite.scale.set(8,8,1);
-            head.add(sprite);
-        }
-        createStadiumLight(-15, -5);
-        createStadiumLight(15, -5);
-        createStadiumLight(-15, -30);
-        createStadiumLight(15, -30);
-
         const groundGroup = new THREE.Group();
         const grassGeo = new THREE.PlaneGeometry(100, 100);
-        const grassMat1 = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 1 });
-        const grassMat2 = new THREE.MeshStandardMaterial({ color: 0x27ae60, roughness: 1 });
-        const baseGround = new THREE.Mesh(grassGeo, grassMat1);
+        const grassMat = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 1 });
+        const baseGround = new THREE.Mesh(grassGeo, grassMat);
         baseGround.rotation.x = -Math.PI / 2;
         baseGround.receiveShadow = true;
         groundGroup.add(baseGround);
-        for(let i=0; i<20; i++) {
-            const stripe = new THREE.Mesh(new THREE.PlaneGeometry(100, 5), grassMat2);
-            stripe.rotation.x = -Math.PI / 2;
-            stripe.position.y = 0.01;
-            stripe.position.z = -50 + (i * 10);
-            stripe.receiveShadow = true;
-            groundGroup.add(stripe);
-        }
         scene.add(groundGroup);
 
         function createGoal() {
             const goalGroup = new THREE.Group();
-            const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+            const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
             const postGeo = new THREE.CylinderGeometry(0.15, 0.15, CONFIG.goalHeight);
-            const leftPost = new THREE.Mesh(postGeo, postMat);
-            leftPost.position.set(-CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
-            leftPost.castShadow = true;
-            const rightPost = new THREE.Mesh(postGeo, postMat);
-            rightPost.position.set(CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
-            rightPost.castShadow = true;
-            const crossBarGeo = new THREE.CylinderGeometry(0.15, 0.15, CONFIG.goalWidth);
-            const crossBar = new THREE.Mesh(crossBarGeo, postMat);
-            crossBar.rotation.z = Math.PI / 2;
-            crossBar.position.set(0, CONFIG.goalHeight, 0);
-            crossBar.castShadow = true;
-            const netGeo = new THREE.BoxGeometry(CONFIG.goalWidth, CONFIG.goalHeight, 2);
-            const netMat = new THREE.MeshBasicMaterial({ color: 0xcccccc, wireframe: true, transparent: true, opacity: 0.2 });
-            const net = new THREE.Mesh(netGeo, netMat);
+            const leftPost = new THREE.Mesh(postGeo, postMat); leftPost.position.set(-CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
+            const rightPost = new THREE.Mesh(postGeo, postMat); rightPost.position.set(CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
+            const crossBar = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, CONFIG.goalWidth), postMat);
+            crossBar.rotation.z = Math.PI / 2; crossBar.position.set(0, CONFIG.goalHeight, 0);
+            const net = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.goalWidth, CONFIG.goalHeight, 2), new THREE.MeshBasicMaterial({ color: 0xcccccc, wireframe: true, transparent: true, opacity: 0.2 }));
             net.position.set(0, CONFIG.goalHeight/2, 1);
             goalGroup.add(leftPost, rightPost, crossBar, net);
             goalGroup.position.z = CONFIG.goalZ; 
             scene.add(goalGroup);
-            return goalGroup;
         }
-        const goal = createGoal();
+        createGoal();
 
         const keeperGroup = new THREE.Group();
-        const keeperBodyGeo = new THREE.BoxGeometry(1.2, 2.5, 0.5);
-        const keeperMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
-        const keeperBody = new THREE.Mesh(keeperBodyGeo, keeperMat);
-        keeperBody.position.y = 1.25;
-        keeperBody.castShadow = true;
+        const keeperBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0xe74c3c }));
+        keeperBody.position.y = 1.25; keeperBody.castShadow = true;
         keeperGroup.add(keeperBody);
-        const armGeo = new THREE.BoxGeometry(0.3, 1.2, 0.3);
-        const leftArm = new THREE.Mesh(armGeo, keeperMat); leftArm.position.set(-0.8, 1.8, 0); leftArm.rotation.z = 0.5;
-        const rightArm = new THREE.Mesh(armGeo, keeperMat); rightArm.position.set(0.8, 1.8, 0); rightArm.rotation.z = -0.5;
-        keeperGroup.add(leftArm, rightArm);
         keeperGroup.position.set(0, 0, CONFIG.goalZ + 1);
         scene.add(keeperGroup);
-
-        const wallGroup = new THREE.Group();
-        const dummyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.8, 16);
-        const dummyMat = new THREE.MeshStandardMaterial({ color: 0x34495e });
-        [-0.8, 0, 0.8].forEach(x => {
-            const dummy = new THREE.Mesh(dummyGeo, dummyMat);
-            dummy.position.set(x, 0.9, 0);
-            dummy.castShadow = true;
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color: 0xf1c40f}));
-            head.position.y = 1.1;
-            dummy.add(head);
-            wallGroup.add(dummy);
-        });
-        wallGroup.position.set(-2, 0, CONFIG.wallZ);
-        scene.add(wallGroup);
 
         const ballGeo = new THREE.SphereGeometry(0.4, 32, 32);
         const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
         const ball = new THREE.Mesh(ballGeo, ballMat);
         ball.castShadow = true;
-        const dotGeo = new THREE.SphereGeometry(0.15, 8, 8);
-        const dotMat = new THREE.MeshBasicMaterial({ color: 0x2c3e50 });
-        const d1=new THREE.Mesh(dotGeo,dotMat); d1.position.set(0.35,0,0); ball.add(d1);
-        const d2=new THREE.Mesh(dotGeo,dotMat); d2.position.set(-0.35,0,0); ball.add(d2);
-        const d3=new THREE.Mesh(dotGeo,dotMat); d3.position.set(0,0.35,0); ball.add(d3);
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial({ color: 0x2c3e50 }));
+        dot.position.x = 0.35; ball.add(dot);
         scene.add(ball);
 
-        const ringGeo = new THREE.RingGeometry(0.5, 0.6, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
-        const kickZone = new THREE.Mesh(ringGeo, ringMat);
-        kickZone.rotation.x = -Math.PI / 2;
-        kickZone.position.set(0, 0.05, -2);
-        scene.add(kickZone);
+        // --- NEW AIMING VISUALS ---
+        // Big Arrow on Ground
+        const arrowShape = new THREE.Shape();
+        arrowShape.moveTo(0, 0);
+        arrowShape.lineTo(0.4, -1);
+        arrowShape.lineTo(0.15, -1);
+        arrowShape.lineTo(0.15, -4);
+        arrowShape.lineTo(-0.15, -4);
+        arrowShape.lineTo(-0.15, -1);
+        arrowShape.lineTo(-0.4, -1);
+        arrowShape.lineTo(0, 0);
+        const arrowGeo = new THREE.ShapeGeometry(arrowShape);
+        const arrowMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+        const aimArrow3D = new THREE.Mesh(arrowGeo, arrowMat);
+        aimArrow3D.rotation.x = -Math.PI / 2;
+        aimArrow3D.position.y = 0.05;
+        scene.add(aimArrow3D);
 
-        const zoneGeo = new THREE.RingGeometry(0.8, 1.0, 32);
-        const zoneMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
-        const playerZone = new THREE.Mesh(zoneGeo, zoneMat);
-        playerZone.rotation.x = -Math.PI / 2;
-        playerZone.position.set(0, 0.02, -1.0); 
-        scene.add(playerZone);
-
-        const aimStickGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 8); 
-        const aimStickMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.6 });
-        const aimStick = new THREE.Mesh(aimStickGeo, aimStickMat);
-        aimStick.geometry.rotateX(-Math.PI / 2); 
-        aimStick.geometry.translate(0, 0, 0.5); 
-        scene.add(aimStick);
-        aimStick.visible = false;
-
-        const ghostBallGeo = new THREE.SphereGeometry(0.2, 16, 16);
-        const ghostBallMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5, wireframe: true });
-        const ghostBall = new THREE.Mesh(ghostBallGeo, ghostBallMat);
-        scene.add(ghostBall);
-        ghostBall.visible = false;
-
-        const trailSize = 50;
         const trailGeo = new THREE.BufferGeometry();
-        const trailPos = new Float32Array(trailSize * 3);
+        const trailPos = new Float32Array(50 * 3);
         trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
-        const trailMat = new THREE.LineBasicMaterial({ color: 0x3498db, opacity: 0.8, transparent: true, linewidth: 3 });
-        const trailLine = new THREE.Line(trailGeo, trailMat);
+        const trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0x3498db, opacity: 0.8, transparent: true }));
         scene.add(trailLine);
-        trailLine.frustumCulled = false;
 
         function updateTrail() {
             if(state.ballState === 'FLYING') {
                 const positions = trailLine.geometry.attributes.position.array;
-                for(let i = trailSize - 1; i > 0; i--) {
+                for(let i = 49; i > 0; i--) {
                     positions[i * 3] = positions[(i - 1) * 3];
                     positions[i * 3 + 1] = positions[(i - 1) * 3 + 1];
                     positions[i * 3 + 2] = positions[(i - 1) * 3 + 2];
                 }
-                positions[0] = ball.position.x;
-                positions[1] = ball.position.y;
-                positions[2] = ball.position.z;
+                positions[0] = ball.position.x; positions[1] = ball.position.y; positions[2] = ball.position.z;
                 trailLine.geometry.attributes.position.needsUpdate = true;
                 trailLine.visible = true;
             } else {
@@ -472,309 +335,128 @@
             }
         }
 
-        const particleCount = 100;
-        const particlesGeo = new THREE.BufferGeometry();
-        const pPos = new Float32Array(particleCount * 3);
-        const pVel = [];
-        const pCols = new Float32Array(particleCount * 3);
-        for(let i=0; i<particleCount; i++) {
-            pVel.push({x:0, y:0, z:0, active: false});
-            const c = new THREE.Color().setHSL(Math.random(), 1.0, 0.5);
-            pCols[i*3] = c.r; pCols[i*3+1] = c.g; pCols[i*3+2] = c.b;
-        }
-        particlesGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-        particlesGeo.setAttribute('color', new THREE.BufferAttribute(pCols, 3));
-        const particlesMat = new THREE.PointsMaterial({ size: 0.3, vertexColors: true, transparent: true });
-        const particleSystem = new THREE.Points(particlesGeo, particlesMat);
-        scene.add(particleSystem);
-        
-        function explodeParticles(x, y, z) {
-            const positions = particleSystem.geometry.attributes.position.array;
-            for(let i=0; i<particleCount; i++) {
-                positions[i*3] = x;
-                positions[i*3+1] = y;
-                positions[i*3+2] = z;
-                pVel[i].x = (Math.random() - 0.5) * 0.5;
-                pVel[i].y = (Math.random() * 0.5) + 0.2;
-                pVel[i].z = (Math.random() - 0.5) * 0.5;
-                pVel[i].active = true;
-            }
-            particleSystem.visible = true;
-        }
-
-        function updateParticles() {
-            if(!particleSystem.visible) return;
-            const positions = particleSystem.geometry.attributes.position.array;
-            let activeCount = 0;
-            for(let i=0; i<particleCount; i++) {
-                if(pVel[i].active) {
-                    activeCount++;
-                    pVel[i].y -= 0.01;
-                    positions[i*3] += pVel[i].x;
-                    positions[i*3+1] += pVel[i].y;
-                    positions[i*3+2] += pVel[i].z;
-                    if(positions[i*3+1] < 0) pVel[i].active = false;
-                }
-            }
-            particleSystem.geometry.attributes.position.needsUpdate = true;
-            if(activeCount === 0) particleSystem.visible = false;
-        }
-        particleSystem.visible = false;
-
-        // --- FOOT VISUALS: Shoe Vector Model ---
-        function createFootModel(color) {
-            const group = new THREE.Group();
-            // Ankle
-            const ankle = new THREE.Mesh(
-                new THREE.SphereGeometry(0.15, 8, 8),
-                new THREE.MeshBasicMaterial({ color: color, wireframe: true, transparent: true, opacity: 0.6 })
-            );
-            // Foot body (Heel to Toe)
-            const footBody = new THREE.Mesh(
-                new THREE.BoxGeometry(0.2, 0.1, 0.4),
-                new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.4 })
-            );
-            footBody.position.z = 0.1; // Offset so ankle is at back
-            group.add(ankle);
-            group.add(footBody);
-            // Toe Pointer
-            const toe = new THREE.Mesh(
-                new THREE.ConeGeometry(0.05, 0.2, 8),
-                new THREE.MeshBasicMaterial({ color: 0xffffff })
-            );
-            toe.rotation.x = Math.PI / 2;
-            toe.position.z = 0.4;
-            group.add(toe);
-            
-            return group;
-        }
-        
-        const leftFootMesh = createFootModel(0xe74c3c);
-        const rightFootMesh = createFootModel(0x3498db);
-        leftFootMesh.renderOrder = 999;
-        rightFootMesh.renderOrder = 999;
-        scene.add(leftFootMesh);
-        scene.add(rightFootMesh);
-        
-        leftFootMesh.visible = false;
-        rightFootMesh.visible = false;
-
         function resetBall() {
             clearTimeout(state.ballSafetyTimer);
             ball.position.set(0, 0.4, -2);
             ball.rotation.set(0,0,0);
             state.velocity.set(0,0,0);
             state.ballState = 'IDLE';
-            document.getElementById('p-meter-cont').style.display = 'none';
-            document.getElementById('technique-label').style.opacity = '0'; // Hide technique text
-            kickZone.material.opacity = 0.6;
-            kickZone.scale.set(1,1,1);
-            wallGroup.position.x = (Math.random() * 4) - 2;
+            aimArrow3D.visible = true;
             
             if(state.phase === 'PLAYING') {
                 const tween = setInterval(() => {
                     camera.position.lerp(defaultCamPos, 0.05);
-                    const currentLookAt = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).add(camera.position);
                     const targetLook = defaultLookAt.clone();
-                    currentLookAt.lerp(targetLook, 0.05);
                     camera.lookAt(targetLook);
                     if(camera.position.distanceTo(defaultCamPos) < 0.1) clearInterval(tween);
                 }, 16);
-                leftFootMesh.visible = true;
-                rightFootMesh.visible = true;
             }
         }
         resetBall();
 
-        // --- PHYSICS: ADVANCED KICK LOGIC ---
-        function triggerKick(speed, footX, swingVelocityX) {
-            if(state.ballState !== 'IDLE' || state.outOfBounds) return;
-            
-            // Calculate Impact Offset (Where did foot hit ball relative to center?)
-            // Positive = Right side hit (Inside for Right Foot, Outside for Left Foot)
-            // Negative = Left side hit (Outside for Right Foot, Inside for Left Foot)
-            const impactOffset = (footX - ball.position.x); 
-            
-            let technique = "KNUCKLEBALL";
-            let curve = 0;
-            let kickType = 'power';
-            
-            // Determine Technique based on offset
-            if (Math.abs(impactOffset) < 0.05) {
-                // Center Hit -> Power / Knuckle
-                technique = "POWER LACES";
-                curve = (Math.random() - 0.5) * 0.1; // Slight wobble
-            } else if (impactOffset > 0.05) {
-                // Right Side Hit
-                if(swingVelocityX < 0) { // Right foot swinging left
-                    technique = "INSIDE CURL";
-                    curve = -0.5 * (Math.abs(impactOffset) * 5); // Curve Left
-                    kickType = 'finesse';
-                } else {
-                    technique = "OUTSIDE TRIVELA"; // Left foot swinging right
-                    curve = -0.3;
-                    kickType = 'finesse';
-                }
-            } else {
-                // Left Side Hit
-                if(swingVelocityX < 0) { // Right foot swinging left
-                    technique = "OUTSIDE TRIVELA";
-                    curve = 0.5 * (Math.abs(impactOffset) * 5); // Curve Right
-                    kickType = 'finesse';
-                } else {
-                    technique = "INSIDE CURL"; // Left foot swinging right
-                    curve = 0.3;
-                    kickType = 'finesse';
-                }
-            }
-
-            AudioSys.playKick(kickType);
-            state.ballState = 'FLYING';
-            kickZone.material.opacity = 0; 
-            aimStick.visible = false;
-            ghostBall.visible = false;
-
-            // Show Technique UI
-            const techLabel = document.getElementById('technique-label');
-            techLabel.innerText = technique;
-            techLabel.style.opacity = '1';
-
-            state.ballSafetyTimer = setTimeout(resetBall, 4000);
-            const positions = trailLine.geometry.attributes.position.array;
-            for(let i=0; i<trailSize*3; i++) positions[i] = ball.position.x;
-            
-            const power = Math.min(speed, 22); // Increased max power slightly
-            
-            const lift = Math.min(power * 0.1, 0.9); 
-            const fwd = Math.min(power * 0.28, 2.5);
-            
-            state.velocity.set(curve, lift, -fwd);
-            
-            const speedKm = Math.round(power * 10); 
-            document.getElementById('speed-val').innerText = speedKm;
-            const bar = document.getElementById('p-bar');
-            document.getElementById('p-meter-cont').style.display = 'block';
-            bar.style.width = Math.min((speedKm / 120) * 100, 100) + "%";
-            document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
-        }
-
+        // --- NEW ARCADE KICK LOGIC ---
         function updateAiming() {
             if(state.ballState !== 'IDLE' || state.phase !== 'PLAYING') {
-                aimStick.visible = false;
-                ghostBall.visible = false;
+                aimArrow3D.visible = false;
                 return;
             }
+            aimArrow3D.visible = true;
 
-            const leftDist = leftFootMesh.position.distanceTo(ball.position);
-            const rightDist = rightFootMesh.position.distanceTo(ball.position);
+            // 1. Horizontal Aim (Yaw) - Based on Hips Left/Right
+            // Hip Center 0.5 is middle. 
+            // Range 0.3 (Left) to 0.7 (Right).
+            const rawX = state.hipCenter.x;
+            const centerOffset = 0.5 - rawX; // Positive = Left, Negative = Right
+            state.aimAngle = centerOffset * 2.5; // Multiplier for sensitivity
             
-            let activeFoot = null;
+            // 2. Vertical Aim (Power/Loft) - Based on Scale (Distance)
+            // Scale 0.2 (Far) -> High Loft (0.9)
+            // Scale 0.5 (Close) -> Low Loft (0.2)
+            const distFactor = Math.max(0, Math.min(1, (0.5 - state.playerScale) * 3));
+            state.aimPower = 0.2 + (distFactor * 0.7);
 
-            if(leftDist < 1.5 && leftDist < rightDist) {
-                activeFoot = leftFootMesh;
-                // Highlight active foot
-                leftFootMesh.children[1].material.color.setHex(0x00ff00);
-                leftFootMesh.children[1].material.opacity = 0.8;
-                rightFootMesh.children[1].material.color.setHex(0x3498db);
-                rightFootMesh.children[1].material.opacity = 0.4;
-            } else if (rightDist < 1.5) {
-                activeFoot = rightFootMesh;
-                // Highlight active foot
-                rightFootMesh.children[1].material.color.setHex(0x00ff00);
-                rightFootMesh.children[1].material.opacity = 0.8;
-                leftFootMesh.children[1].material.color.setHex(0xe74c3c);
-                leftFootMesh.children[1].material.opacity = 0.4;
-            } else {
-                aimStick.visible = false;
-                ghostBall.visible = false;
-                return;
-            }
-
-            const footX = activeFoot.position.x;
-            const offset = (footX - ball.position.x);
-            // Visual aiming now reflects offset (Inside vs Outside)
-            // If offset is positive (right side hit), aiming curve goes Left
-            const predictedCurve = offset * -2.5; 
+            // Update Visuals
+            aimArrow3D.rotation.z = state.aimAngle;
+            aimArrow3D.scale.y = 1 + (state.aimPower * 1.5); // Arrow gets longer with power
             
-            const targetZ = CONFIG.goalZ;
-            const targetX = ball.position.x + (predictedCurve * (Math.abs(targetZ)/2.5));
+            // Update UI Bars
+            const aimYInd = document.getElementById('aim-y-ind');
+            aimYInd.style.top = `${(1 - state.aimPower) * 100}%`;
+        }
 
-            aimStick.position.copy(ball.position);
-            const targetVec = new THREE.Vector3(targetX, CONFIG.goalHeight/2, targetZ);
-            aimStick.lookAt(targetVec); 
-            const length = ball.position.distanceTo(targetVec);
-            aimStick.scale.set(1, 1, length); 
-            aimStick.visible = true;
+        function triggerKick(gestureSpeed) {
+            if(state.ballState !== 'IDLE') return;
+            
+            AudioSys.playKick();
+            state.ballState = 'FLYING';
+            aimArrow3D.visible = false;
+            state.ballSafetyTimer = setTimeout(resetBall, 4000);
 
-            ghostBall.position.set(targetX, CONFIG.goalHeight/2, targetZ);
-            ghostBall.visible = true;
+            // Physics Launch
+            const basePower = 15 + (gestureSpeed * 0.2); // Base speed + swing bonus
+            const speed = Math.min(basePower, 25);
+            
+            // Vector Math: Rotate forward vector by aimAngle
+            const fwd = new THREE.Vector3(0, 0, -1);
+            fwd.applyAxisAngle(new THREE.Vector3(0, 1, 0), state.aimAngle);
+            
+            const lift = state.aimPower * 0.8; // Height based on distance
+            
+            state.velocity.set(fwd.x * speed * 0.2, lift, fwd.z * speed * 0.25);
+            
+            document.getElementById('speed-val').innerText = Math.round(speed * 10);
+            document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
         }
 
         function updateBall() {
             if(state.ballState === 'FLYING') {
-                state.velocity.y -= 0.025;
-                state.velocity.z *= 0.995;
-                const prevPos = ball.position.clone();
+                state.velocity.y -= 0.025; // Gravity
+                state.velocity.z *= 0.995; // Drag
                 ball.position.add(state.velocity);
                 ball.rotation.x -= state.velocity.z * 0.2; 
-                ball.rotation.z -= state.velocity.x * 0.2; 
-                const targetLook = new THREE.Vector3(
-                    ball.position.x * 0.3, 
-                    Math.max(0, ball.position.y * 0.4 + 1.0), 
-                    ball.position.z * 0.8 - 5
-                );
+                
+                // Camera Follow
+                const targetLook = new THREE.Vector3(ball.position.x * 0.5, ball.position.y * 0.5 + 1, ball.position.z - 5);
                 const currentLook = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).add(camera.position);
                 currentLook.lerp(targetLook, 0.05);
                 camera.lookAt(currentLook);
 
+                // Floor Bounce
                 if(ball.position.y < 0.4) {
                     ball.position.y = 0.4;
                     state.velocity.y *= -0.6;
-                    state.velocity.z *= 0.8;
                 }
-                if(ball.position.z < (CONFIG.wallZ + 0.5) && ball.position.z > (CONFIG.wallZ - 0.5)) {
-                    const distToWallCenter = Math.abs(ball.position.x - wallGroup.position.x);
-                    if(distToWallCenter < 1.5 && ball.position.y < 2.0) {
-                        state.velocity.z *= -0.5;
-                        state.velocity.y += 0.2;
-                        AudioSys.playHit();
-                        showFeedback("BLOCKED!", "");
-                    }
-                }
-                const kx = keeperGroup.position.x;
-                const ky = keeperGroup.position.y;
-                const kz = keeperGroup.position.z;
-                const dx = Math.abs(ball.position.x - kx);
-                const dy = Math.abs(ball.position.y - ky);
-                const dz = Math.abs(ball.position.z - kz);
-                if(dz < 0.8 && dx < 1.0 && dy < 1.5) {
+                
+                // Keeper Collision
+                if(Math.abs(ball.position.z - keeperGroup.position.z) < 1 && 
+                   Math.abs(ball.position.x - keeperGroup.position.x) < 1 &&
+                   ball.position.y < 2.5) {
                     state.velocity.z *= -0.5;
-                    state.velocity.x += (Math.random()-0.5);
                     AudioSys.playHit();
-                    showFeedback("SAVED!", "");
+                    showFeedback("SAVED!", "🧤");
                 }
-                if(prevPos.z >= CONFIG.goalZ && ball.position.z <= CONFIG.goalZ) {
+
+                // Goal Check
+                if(ball.position.z <= CONFIG.goalZ && ball.position.z > CONFIG.goalZ - 2) {
                     if(Math.abs(ball.position.x) < CONFIG.goalWidth/2 && ball.position.y < CONFIG.goalHeight) {
                         scoreGoal();
                     }
                 }
+
                 if(ball.position.z < -40 || Math.abs(ball.position.x) > 25) {
                     state.ballState = 'RESETTING';
                     clearTimeout(state.ballSafetyTimer);
                     setTimeout(resetBall, 800);
                 }
             } else {
-                const s = 1 + Math.sin(Date.now() * 0.005) * 0.1;
-                kickZone.scale.set(s, s, 1);
-                const ps = 1 + Math.sin(Date.now() * 0.005) * 0.1;
-                playerZone.material.opacity = 0.6 + (Math.sin(Date.now() * 0.01) * 0.2);
+                updateAiming();
             }
         }
 
-        function showFeedback(text, subtext) {
+        function showFeedback(text, emoji) {
              const fb = document.getElementById('feedback-text');
              fb.innerText = text;
-             document.getElementById('aim-arrow').innerText = subtext;
+             document.getElementById('aim-arrow-txt').innerText = emoji;
              document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(1)";
         }
 
@@ -784,7 +466,6 @@
             state.ballState = 'RESETTING';
             clearTimeout(state.ballSafetyTimer);
             AudioSys.playGoal();
-            explodeParticles(ball.position.x, ball.position.y, ball.position.z);
             showFeedback("GOAL!!!", "⚽");
             setTimeout(() => {
                 document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
@@ -793,69 +474,44 @@
         }
 
         function updateKeeper() {
-            if(state.ballState === 'FLYING') {
-                if(ball.position.z < -5) {
-                    const targetX = Math.max(-CONFIG.goalWidth/2 + 1, Math.min(CONFIG.goalWidth/2 - 1, ball.position.x));
-                    keeperGroup.position.x += (targetX - keeperGroup.position.x) * 0.15;
-                    if(ball.position.y > 2 && keeperGroup.position.y < 2) {
-                         keeperGroup.position.y += 0.2;
-                    }
-                }
+            if(state.ballState === 'FLYING' && ball.position.z < -5) {
+                const targetX = Math.max(-CONFIG.goalWidth/2 + 1, Math.min(CONFIG.goalWidth/2 - 1, ball.position.x));
+                keeperGroup.position.x += (targetX - keeperGroup.position.x) * 0.15;
             } else {
                 keeperGroup.position.x = Math.sin(Date.now() * 0.002) * 3;
-                keeperGroup.position.y = 0;
             }
         }
 
-        function updateFootTracking(ankle, toe, footState, mesh) {
-            if(state.phase !== 'PLAYING') return;
-            const scale = Math.max(state.playerScale, CONFIG.minScale);
+        function checkKickGesture(footState) {
+            // Simple velocity check: Is foot moving fast?
+            const speed = Math.sqrt(footState.vx*footState.vx + footState.vy*footState.vy);
             
-            // ANKLE POSITION
-            const relX = (ankle.x - state.hipCenter.x) / scale * -1.0; 
-            const relY = (ankle.y - state.hipCenter.y) / scale; 
+            // Check direction: Must be swinging UP or FORWARD (negative Y in screen space usually)
+            // We'll mostly rely on raw speed + proximity to bottom of screen (swinging phase)
+            if(speed > CONFIG.kickThreshold) {
+                triggerKick(speed);
+            }
+        }
+
+        function updateFootTracking(landmark, footState) {
+            if(state.phase !== 'PLAYING') return;
+            const scale = Math.max(state.playerScale, 0.1);
+            
+            const relX = (landmark.x - state.hipCenter.x) / scale * -1.0; 
+            const relY = (landmark.y - state.hipCenter.y) / scale; 
             const targetX = relX * 4.0; 
             const targetY = (relY * -4.0) + 2.5; 
 
-            // TOE POSITION (For orientation)
-            const toeRelX = (toe.x - state.hipCenter.x) / scale * -1.0;
-            const toeRelY = (toe.y - state.hipCenter.y) / scale;
-            const toeTargetX = toeRelX * 4.0;
-            // We use the 2D projected toe Y to estimate 3D Z orientation roughly
-            // If toe is much lower than ankle in 2D, it points forward/down
-            
-            const smoothFactor = 0.5;
-            const newX = footState.x + (targetX - footState.x) * smoothFactor;
-            const newY = footState.y + (targetY - footState.y) * smoothFactor;
-            
-            // Velocity Calc
-            const vx = (newX - footState.x) * 60;
-            const vy = (newY - footState.y) * 60;
-            const speed = Math.sqrt(vx*vx + vy*vy);
+            const vx = (targetX - footState.x) * 60;
+            const vy = (targetY - footState.y) * 60;
 
-            footState.x = newX;
-            footState.y = newY;
+            footState.x = targetX;
+            footState.y = targetY;
             footState.vx = vx;
             footState.vy = vy;
 
-            // Update Mesh Position (Ankle)
-            mesh.position.x = newX;
-            mesh.position.y = newY;
-            mesh.position.z = -1.5; 
-            
-            // Update Mesh Rotation (Point towards Toe)
-            // vector from Ankle to Toe
-            const dx = toeTargetX - targetX;
-            // Simple rotation around Y based on toe x offset
-            mesh.rotation.y = -dx * 2.0; 
-
-            if(ankle.visibility > 0.6) {
-                const distToBall = Math.sqrt(Math.pow(newX - ball.position.x, 2) + Math.pow(newY - ball.position.y, 2));
-                // Only kick if moving fast enough and close enough
-                if(speed > CONFIG.kickThreshold && distToBall < 0.6 && newY < 1.0) {
-                    triggerKick(speed, newX, vx);
-                }
-            }
+            // Trigger Check
+            checkKickGesture(footState);
         }
 
         function startCountdown() {
@@ -881,61 +537,30 @@
                     document.getElementById('setup-overlay').style.display = 'none';
                     state.phase = 'PLAYING';
                     document.getElementById('ui-layer').classList.add('game-active'); 
+                    document.getElementById('controls-hint').style.display = 'block';
+                    document.getElementById('aim-hud-left').style.display = 'block';
                     const tween = setInterval(() => {
                         camera.position.lerp(defaultCamPos, 0.05);
                         camera.lookAt(defaultLookAt);
                         if(camera.position.distanceTo(defaultCamPos) < 0.1) clearInterval(tween);
                     }, 16);
-                    leftFootMesh.visible = true;
-                    rightFootMesh.visible = true;
                 }
             }, 1000);
-        }
-
-        function checkPlayerPosition(landmarks) {
-            if(state.phase !== 'PLAYING') return;
-            const hipX = (landmarks[23].x + landmarks[24].x) / 2;
-            
-            // --- ADAPTIVE POSITIONING FIX ---
-            // Allow player to move significantly left/right (0.15 to 0.85) to align their shot
-            // Only trigger warning if they are about to leave frame
-            const isCentered = hipX > 0.1 && hipX < 0.9; 
-            
-            const warningEl = document.getElementById('warning-msg');
-            if (!isCentered) {
-                state.outOfBounds = true;
-                warningEl.style.display = 'block';
-                playerZone.material.color.setHex(0xe74c3c); 
-            } else {
-                state.outOfBounds = false;
-                warningEl.style.display = 'none';
-                playerZone.material.color.setHex(0x00ffff); 
-            }
         }
 
         function checkAutoStart(landmarks) {
             if(state.phase !== 'SETUP') return;
             const shoulderWidth = Math.abs(landmarks[11].x - landmarks[12].x);
             const feetVisible = landmarks[27].visibility > 0.6 && landmarks[28].visibility > 0.6;
-            const playerIsFar = shoulderWidth < 0.45 && shoulderWidth > 0.15; 
             const hipX = (landmarks[23].x + landmarks[24].x) / 2;
-            // Setup still requires center for calibration
             const isCentered = Math.abs(hipX - 0.5) < 0.15; 
-            const guide = document.getElementById('guide-reticle');
             const statusTxt = document.getElementById('guide-status');
+            const guide = document.getElementById('guide-reticle');
             
             if(!isCentered) {
                 guide.className = 'guide-bad';
                 statusTxt.innerText = hipX > 0.5 ? "MOVE LEFT ⬅" : "➡ MOVE RIGHT";
                 statusTxt.style.color = '#e74c3c';
-            } else if (!playerIsFar) {
-                guide.className = 'guide-bad';
-                if(shoulderWidth >= 0.45) {
-                    statusTxt.innerText = "MOVE BACK ⬇";
-                } else {
-                    statusTxt.innerText = "COME CLOSER ⬆";
-                }
-                statusTxt.style.color = '#f1c40f';
             } else if (!feetVisible) {
                 guide.className = 'guide-bad';
                 statusTxt.innerText = "SHOW FEET";
@@ -944,15 +569,8 @@
                 guide.className = 'guide-good';
                 statusTxt.innerText = "HOLD STILL...";
                 statusTxt.style.color = '#2ecc71';
-            }
-
-            if(feetVisible && playerIsFar && isCentered) {
                 state.setupTimer++;
-                if(state.setupTimer > 50) { 
-                    startCountdown();
-                } 
-            } else {
-                state.setupTimer = 0;
+                if(state.setupTimer > 50) startCountdown();
             }
         }
 
@@ -966,25 +584,16 @@
             state.hipCenter.x = (state.hipCenter.x * 0.9) + (hipCX * 0.1);
             state.hipCenter.y = (state.hipCenter.y * 0.9) + (hipCY * 0.1);
 
-            document.getElementById('debug-info').innerText = `State: ${state.phase} | Scale: ${state.playerScale.toFixed(2)}`;
-
             if(state.phase === 'SETUP') {
                 checkAutoStart(lm);
             } else if(state.phase === 'PLAYING') {
-                checkPlayerPosition(lm);
-                // Pass Ankle AND Toe landmarks (Left: 27,31; Right: 28,32)
-                updateFootTracking(lm[27], lm[31], state.leftFoot, leftFootMesh);
-                updateFootTracking(lm[28], lm[32], state.rightFoot, rightFootMesh);
+                updateFootTracking(lm[27], state.leftFoot);
+                updateFootTracking(lm[28], state.rightFoot);
             }
         }
 
         const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
-        pose.setOptions({
-            modelComplexity: 1,
-            smoothLandmarks: true, 
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         pose.onResults(onResults);
 
         const videoElement = document.getElementById('input-video');
@@ -1006,18 +615,13 @@
             startBtn.innerText = "Starting...";
         });
 
-        setTimeout(() => {
-            startBtn.disabled = false;
-            startBtn.innerText = "PLAY";
-        }, 1000);
+        setTimeout(() => { startBtn.disabled = false; startBtn.innerText = "PLAY"; }, 1000);
 
         function animate() {
             requestAnimationFrame(animate);
             updateBall();
             updateKeeper();
             updateTrail();
-            updateParticles();
-            updateAiming();
             renderer.render(scene, camera);
         }
         animate();
@@ -1027,7 +631,6 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
-
     </script>
 </body>
 </html>
