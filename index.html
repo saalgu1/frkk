@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>AR Free Kick - Arcade Mode</title>
+    <title>AR Free Kick - Pro Mode</title>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600&display=swap" rel="stylesheet">
@@ -30,38 +30,16 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; pointer-events: none;
             display: flex; flex-direction: column; justify-content: space-between;
-            transition: all 0.5s;
-        }
-
-        #ui-layer.game-active .hud-top {
-            transform: scale(1.4); transform-origin: top center; margin-top: 10px;
         }
 
         .hud-top {
             padding: 20px; display: flex; justify-content: space-between; color: white; text-transform: uppercase;
-            text-shadow: 0 0 10px rgba(0,0,0,0.8); transition: transform 0.5s; width: 100%; box-sizing: border-box;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8); width: 100%; box-sizing: border-box;
         }
 
         .score-box {
-            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.4)); 
-            padding: 10px 25px; border-radius: 8px;
-            border-left: 5px solid #2ecc71; font-size: 32px; letter-spacing: 2px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-
-        /* NEW: Side Bars for Aiming Feedback */
-        #aim-hud-left, #aim-hud-right {
-            position: absolute; top: 50%; width: 20px; height: 200px;
-            background: rgba(0,0,0,0.5); border: 2px solid white; border-radius: 10px;
-            transform: translateY(-50%); display: none;
-        }
-        #aim-hud-left { left: 20px; }
-        #aim-hud-right { right: 20px; }
-        
-        .aim-indicator {
-            width: 100%; height: 20%; background: #f1c40f;
-            position: absolute; top: 50%; transition: top 0.2s;
-            box-shadow: 0 0 10px #f1c40f;
+            background: rgba(0,0,0,0.6); padding: 10px 25px; border-radius: 8px;
+            border-left: 5px solid #f1c40f; font-size: 32px; letter-spacing: 2px;
         }
 
         .center-card {
@@ -71,69 +49,55 @@
             text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
             pointer-events: auto; width: 90%; max-width: 420px;
             transition: opacity 0.3s;
-            backdrop-filter: blur(10px);
             z-index: 100;
         }
 
         .hidden { opacity: 0; pointer-events: none; }
 
-        h1 { margin: 0; color: #2c3e50; font-size: 56px; line-height: 0.9; letter-spacing: 1px; }
+        h1 { margin: 0; color: #2c3e50; font-size: 56px; line-height: 0.9; }
         p { font-family: sans-serif; color: #7f8c8d; margin-bottom: 24px; font-size: 16px; line-height: 1.5; }
 
         button {
-            background: linear-gradient(to right, #e74c3c, #c0392b); 
-            color: white; border: none; padding: 16px 40px; border-radius: 30px;
+            background: #e74c3c; color: white; border: none; padding: 16px 40px; border-radius: 30px;
             font-size: 28px; font-family: 'Teko', sans-serif;
             cursor: pointer; text-transform: uppercase; letter-spacing: 2px; width: 100%;
-            transition: transform 0.1s, box-shadow 0.2s;
-            box-shadow: 0 10px 20px rgba(231, 76, 60, 0.3);
         }
-        button:disabled { background: #bdc3c7; cursor: wait; box-shadow: none; }
+        button:disabled { background: #bdc3c7; cursor: wait; }
 
         #setup-overlay {
-            position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; color: white; text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+            position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: white; text-shadow: 0 2px 10px rgba(0,0,0,1);
             display: none; width: 100%; z-index: 50;
         }
-        #setup-msg { font-size: 60px; color: #f1c40f; font-weight: 600; white-space: nowrap; }
-        #countdown-txt { font-size: 200px; font-weight: bold; display: none; margin-top: -20px; color: white;}
+        #setup-msg { font-size: 50px; color: #f1c40f; font-weight: 600; white-space: nowrap; }
+        #countdown-txt { font-size: 150px; font-weight: bold; display: none; color: white; }
+
+        #kick-feedback {
+            position: absolute; top: 40%; left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 90px; color: #fff;
+            text-shadow: 0 0 20px #f1c40f, 4px 4px 0 #c0392b;
+            transition: transform 0.2s;
+            pointer-events: none; white-space: nowrap; text-align: center; z-index: 20;
+        }
 
         #guide-reticle {
             position: absolute; top: 50%; left: 50%;
-            width: 300px; height: 500px;
+            width: 320px; height: 500px;
             transform: translate(-50%, -45%);
-            border: 8px dashed #00ffff; border-radius: 30px;
+            border: 4px dashed rgba(255,255,255,0.3); border-radius: 20px;
             box-sizing: border-box; pointer-events: none;
-            display: none; transition: all 0.3s; z-index: 40;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+            display: none;
         }
         #guide-status {
-            position: absolute; bottom: 20px; width: 100%; 
-            text-align: center; font-size: 48px; color: white;
-            text-shadow: 0 2px 10px black; font-weight: bold;
-        }
-
-        #kick-feedback {
-            position: absolute; top: 30%; left: 50%;
-            transform: translate(-50%, -50%) scale(0);
-            font-size: 110px; color: #fff;
-            text-shadow: 0 0 20px #f1c40f, 6px 6px 0 #c0392b;
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: none; white-space: nowrap; text-align: center; z-index: 20;
-        }
-        #aim-arrow-txt { font-size: 60px; display: block; margin-top: 5px; color: #f1c40f; text-shadow: 2px 2px 0 #000; }
-
-        #game-container::after {
-            content: " ";
-            display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
-            background-size: 100% 4px; z-index: 2; pointer-events: none;
+            position: absolute; bottom: -50px; width: 100%; 
+            text-align: center; font-size: 30px; color: white;
+            text-shadow: 0 2px 4px black; font-weight: bold;
         }
         
-        #controls-hint {
-            position: absolute; bottom: 10%; width: 100%; text-align: center;
-            color: rgba(255,255,255,0.8); font-size: 24px; display: none;
-            text-shadow: 0 2px 4px black; letter-spacing: 1px;
+        #debug-feet {
+            position: absolute; bottom: 10px; left: 10px;
+            color: rgba(255,255,255,0.5); font-family: monospace;
         }
     </style>
 
@@ -146,12 +110,7 @@
     <video id="input-video" playsinline></video>
     <div id="game-container"></div>
     
-    <div id="kick-feedback">
-        <span id="feedback-text">GOAL!!!</span>
-        <div id="aim-arrow-txt"></div>
-    </div>
-    
-    <div id="aim-hud-left"><div class="aim-indicator" id="aim-y-ind"></div></div>
+    <div id="kick-feedback">GOAL!!!</div>
     
     <div id="guide-reticle">
         <div id="guide-status">Adjusting...</div>
@@ -165,12 +124,9 @@
             </div>
         </div>
 
-        <div id="controls-hint">STEP LEFT/RIGHT TO AIM &bull; SWING TO KICK</div>
-
         <div id="start-screen" class="center-card">
             <h1>FREE KICK PRO</h1>
-            <p style="font-size: 60px; margin: 10px;">⚽</p>
-            <p><strong>NEW CONTROLS:</strong><br>1. Step Side-to-Side to Aim Arrow<br>2. Step Back for High Shots<br>3. Swing Foot to Kick</p>
+            <p>1. <strong>Step Left/Right</strong> to Aim Arrow<br>2. <strong>Watch Your Feet</strong> (Glowing Balls)<br>3. <strong>Kick</strong> the Ball on Screen!</p>
             <button id="start-btn" disabled>Loading Engine...</button>
         </div>
 
@@ -178,20 +134,22 @@
             <div id="setup-msg"></div>
             <div id="countdown-txt">3</div>
         </div>
+        
+        <div id="debug-feet">Waiting for feet...</div>
     </div>
 
     <script>
         /**
-         * FREE KICK PRO - ARCADE UPDATE
-         * Body-Based Aiming System
+         * FREE KICK PRO - PHYSICS UPDATE
+         * Fixes: Ghost Kicks, Foot Visibility, Right-Foot Bias
          */
 
         const CONFIG = {
-            kickThreshold: 2.5, // Speed required to trigger kick
+            kickThreshold: 2.0, // Reduced slightly, but added distance check
+            contactDist: 0.8,   // Foot must be this close to ball to kick
             goalWidth: 14,
             goalHeight: 7,
             goalZ: -24,
-            wallZ: -14,
         };
 
         let state = {
@@ -205,29 +163,8 @@
             hipCenter: {x: 0.5, y: 0.5},
             setupTimer: 0,
             ballSafetyTimer: null,
-            audioEnabled: false,
             aimAngle: 0,
             aimPower: 0.5
-        };
-
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const AudioSys = {
-            playTone: (freq, type, duration, vol = 0.1) => {
-                if(!state.audioEnabled) return;
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + duration);
-            },
-            playKick: () => AudioSys.playTone(60, 'triangle', 0.2, 0.4),
-            playGoal: () => [0, 0.1, 0.2].forEach((t, i) => setTimeout(() => AudioSys.playTone(400 + (i*100), 'square', 0.4, 0.1), t*1000)),
-            playHit: () => AudioSys.playTone(800, 'square', 0.1, 0.1)
         };
 
         const container = document.getElementById('game-container');
@@ -235,10 +172,11 @@
         scene.background = new THREE.Color(0x1a1a2e);
         scene.fog = new THREE.Fog(0x1a1a2e, 10, 60);
 
+        // Camera setup - zoomed in for "Pro Mode" feel
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
-        const defaultCamPos = new THREE.Vector3(0, 1.4, 3.5); 
-        const defaultLookAt = new THREE.Vector3(0, 0.6, -8);
-        camera.position.set(0, 2, 7);
+        const defaultCamPos = new THREE.Vector3(0, 1.6, 4.0); 
+        const defaultLookAt = new THREE.Vector3(0, 0.5, -6);
+        camera.position.set(0, 2, 8);
         camera.lookAt(0, 0.5, -5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -247,93 +185,107 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
         dirLight.position.set(-10, 20, 10);
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // --- ASSETS ---
-        const groundGroup = new THREE.Group();
+        // Ground
         const grassGeo = new THREE.PlaneGeometry(100, 100);
         const grassMat = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 1 });
-        const baseGround = new THREE.Mesh(grassGeo, grassMat);
-        baseGround.rotation.x = -Math.PI / 2;
-        baseGround.receiveShadow = true;
-        groundGroup.add(baseGround);
-        scene.add(groundGroup);
+        const ground = new THREE.Mesh(grassGeo, grassMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
 
+        // Goal
         function createGoal() {
             const goalGroup = new THREE.Group();
             const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
             const postGeo = new THREE.CylinderGeometry(0.15, 0.15, CONFIG.goalHeight);
+            
             const leftPost = new THREE.Mesh(postGeo, postMat); leftPost.position.set(-CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
             const rightPost = new THREE.Mesh(postGeo, postMat); rightPost.position.set(CONFIG.goalWidth/2, CONFIG.goalHeight/2, 0);
             const crossBar = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, CONFIG.goalWidth), postMat);
             crossBar.rotation.z = Math.PI / 2; crossBar.position.set(0, CONFIG.goalHeight, 0);
-            const net = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.goalWidth, CONFIG.goalHeight, 2), new THREE.MeshBasicMaterial({ color: 0xcccccc, wireframe: true, transparent: true, opacity: 0.2 }));
+            
+            const net = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.goalWidth, CONFIG.goalHeight, 2), new THREE.MeshBasicMaterial({ color: 0xcccccc, wireframe: true, transparent: true, opacity: 0.1 }));
             net.position.set(0, CONFIG.goalHeight/2, 1);
+            
             goalGroup.add(leftPost, rightPost, crossBar, net);
             goalGroup.position.z = CONFIG.goalZ; 
             scene.add(goalGroup);
         }
         createGoal();
 
-        const keeperGroup = new THREE.Group();
-        const keeperBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0xe74c3c }));
-        keeperBody.position.y = 1.25; keeperBody.castShadow = true;
-        keeperGroup.add(keeperBody);
-        keeperGroup.position.set(0, 0, CONFIG.goalZ + 1);
-        scene.add(keeperGroup);
+        // The Wall (Defenders)
+        const wallGroup = new THREE.Group();
+        for(let i=-1; i<=1; i++) {
+            const dummy = new THREE.Mesh(new THREE.BoxGeometry(1, 2.8, 0.5), new THREE.MeshStandardMaterial({ color: 0xe74c3c }));
+            dummy.position.set(i * 1.5, 1.4, 0);
+            dummy.castShadow = true;
+            wallGroup.add(dummy);
+        }
+        wallGroup.position.z = -12;
+        wallGroup.position.x = -2; // Start slightly left covering near post
+        scene.add(wallGroup);
 
+        // Goalkeeper
+        const keeperMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0xf39c12 }));
+        keeperMesh.position.set(0, 1.25, CONFIG.goalZ + 1);
+        keeperMesh.castShadow = true;
+        scene.add(keeperMesh);
+
+        // Ball
         const ballGeo = new THREE.SphereGeometry(0.4, 32, 32);
-        const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+        const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
         const ball = new THREE.Mesh(ballGeo, ballMat);
         ball.castShadow = true;
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial({ color: 0x2c3e50 }));
-        dot.position.x = 0.35; ball.add(dot);
         scene.add(ball);
 
-        // --- NEW AIMING VISUALS ---
-        // Big Arrow on Ground
+        // Aim Arrow
         const arrowShape = new THREE.Shape();
-        arrowShape.moveTo(0, 0);
-        arrowShape.lineTo(0.4, -1);
-        arrowShape.lineTo(0.15, -1);
-        arrowShape.lineTo(0.15, -4);
-        arrowShape.lineTo(-0.15, -4);
-        arrowShape.lineTo(-0.15, -1);
-        arrowShape.lineTo(-0.4, -1);
-        arrowShape.lineTo(0, 0);
-        const arrowGeo = new THREE.ShapeGeometry(arrowShape);
-        const arrowMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
-        const aimArrow3D = new THREE.Mesh(arrowGeo, arrowMat);
-        aimArrow3D.rotation.x = -Math.PI / 2;
-        aimArrow3D.position.y = 0.05;
-        scene.add(aimArrow3D);
+        arrowShape.moveTo(0, 0); arrowShape.lineTo(0.5, -1); arrowShape.lineTo(0.2, -1); arrowShape.lineTo(0.2, -4); arrowShape.lineTo(-0.2, -4); arrowShape.lineTo(-0.2, -1); arrowShape.lineTo(-0.5, -1); arrowShape.lineTo(0, 0);
+        const arrowMesh = new THREE.Mesh(new THREE.ShapeGeometry(arrowShape), new THREE.MeshBasicMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.6, side: THREE.DoubleSide }));
+        arrowMesh.rotation.x = -Math.PI / 2;
+        arrowMesh.position.y = 0.05;
+        scene.add(arrowMesh);
 
-        const trailGeo = new THREE.BufferGeometry();
-        const trailPos = new Float32Array(50 * 3);
-        trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
-        const trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0x3498db, opacity: 0.8, transparent: true }));
-        scene.add(trailLine);
+        // FOOT TRACKERS (Visual Debug)
+        const footGeo = new THREE.SphereGeometry(0.3, 16, 16);
+        const leftFootMesh = new THREE.Mesh(footGeo, new THREE.MeshBasicMaterial({ color: 0x3498db, transparent: true, opacity: 0.7, depthTest: false }));
+        const rightFootMesh = new THREE.Mesh(footGeo, new THREE.MeshBasicMaterial({ color: 0xe74c3c, transparent: true, opacity: 0.7, depthTest: false }));
+        // Important: renderOrder ensures they appear ON TOP of the grass/ball so user can see them
+        leftFootMesh.renderOrder = 999;
+        rightFootMesh.renderOrder = 999;
+        scene.add(leftFootMesh);
+        scene.add(rightFootMesh);
 
-        function updateTrail() {
-            if(state.ballState === 'FLYING') {
-                const positions = trailLine.geometry.attributes.position.array;
-                for(let i = 49; i > 0; i--) {
-                    positions[i * 3] = positions[(i - 1) * 3];
-                    positions[i * 3 + 1] = positions[(i - 1) * 3 + 1];
-                    positions[i * 3 + 2] = positions[(i - 1) * 3 + 2];
-                }
-                positions[0] = ball.position.x; positions[1] = ball.position.y; positions[2] = ball.position.z;
-                trailLine.geometry.attributes.position.needsUpdate = true;
-                trailLine.visible = true;
-            } else {
-                trailLine.visible = false;
+        // Audio System (Synthesized)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+            if (type === 'KICK') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(80, now); osc.frequency.exponentialRampToValueAtTime(10, now + 0.1);
+                gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'GOAL') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now+0.1); osc.frequency.setValueAtTime(800, now+0.2);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now+1);
+                osc.start(now); osc.stop(now+1);
             }
         }
+
+        // --- GAME LOGIC ---
 
         function resetBall() {
             clearTimeout(state.ballSafetyTimer);
@@ -341,204 +293,206 @@
             ball.rotation.set(0,0,0);
             state.velocity.set(0,0,0);
             state.ballState = 'IDLE';
-            aimArrow3D.visible = true;
+            arrowMesh.visible = true;
+            leftFootMesh.visible = true;
+            rightFootMesh.visible = true;
+            
+            // Randomize wall position slightly
+            wallGroup.position.x = (Math.random() * 6) - 3;
             
             if(state.phase === 'PLAYING') {
                 const tween = setInterval(() => {
-                    camera.position.lerp(defaultCamPos, 0.05);
-                    const targetLook = defaultLookAt.clone();
-                    camera.lookAt(targetLook);
+                    camera.position.lerp(defaultCamPos, 0.1);
+                    camera.lookAt(defaultLookAt);
                     if(camera.position.distanceTo(defaultCamPos) < 0.1) clearInterval(tween);
                 }, 16);
             }
         }
         resetBall();
 
-        // --- NEW ARCADE KICK LOGIC ---
         function updateAiming() {
             if(state.ballState !== 'IDLE' || state.phase !== 'PLAYING') {
-                aimArrow3D.visible = false;
-                return;
+                arrowMesh.visible = false; return;
             }
-            aimArrow3D.visible = true;
+            arrowMesh.visible = true;
 
-            // 1. Horizontal Aim (Yaw) - Based on Hips Left/Right
-            // Hip Center 0.5 is middle. 
-            // Range 0.3 (Left) to 0.7 (Right).
+            // Hip Center 0.5 is middle. User moves Left (< 0.5) to aim Right.
+            // Right-foot bias: shift neutral zone to 0.45
             const rawX = state.hipCenter.x;
-            const centerOffset = 0.5 - rawX; // Positive = Left, Negative = Right
-            state.aimAngle = centerOffset * 2.5; // Multiplier for sensitivity
+            const centerOffset = 0.45 - rawX; 
+            state.aimAngle = centerOffset * 3.0;
             
-            // 2. Vertical Aim (Power/Loft) - Based on Scale (Distance)
-            // Scale 0.2 (Far) -> High Loft (0.9)
-            // Scale 0.5 (Close) -> Low Loft (0.2)
-            const distFactor = Math.max(0, Math.min(1, (0.5 - state.playerScale) * 3));
-            state.aimPower = 0.2 + (distFactor * 0.7);
-
-            // Update Visuals
-            aimArrow3D.rotation.z = state.aimAngle;
-            aimArrow3D.scale.y = 1 + (state.aimPower * 1.5); // Arrow gets longer with power
-            
-            // Update UI Bars
-            const aimYInd = document.getElementById('aim-y-ind');
-            aimYInd.style.top = `${(1 - state.aimPower) * 100}%`;
+            arrowMesh.rotation.z = state.aimAngle;
         }
 
-        function triggerKick(gestureSpeed) {
-            if(state.ballState !== 'IDLE') return;
-            
-            AudioSys.playKick();
+        function triggerKick(speed, footX) {
+            playSound('KICK');
             state.ballState = 'FLYING';
-            aimArrow3D.visible = false;
-            state.ballSafetyTimer = setTimeout(resetBall, 4000);
+            state.ballSafetyTimer = setTimeout(resetBall, 3500);
 
-            // Physics Launch
-            const basePower = 15 + (gestureSpeed * 0.2); // Base speed + swing bonus
-            const speed = Math.min(basePower, 25);
+            // Calculate Power & Direction
+            const power = Math.min(speed, 25);
+            // Curve depends on where foot hit ball relative to center
+            const impactOffset = (footX - ball.position.x) * 2.0; 
             
-            // Vector Math: Rotate forward vector by aimAngle
             const fwd = new THREE.Vector3(0, 0, -1);
             fwd.applyAxisAngle(new THREE.Vector3(0, 1, 0), state.aimAngle);
             
-            const lift = state.aimPower * 0.8; // Height based on distance
+            // Apply Physics
+            state.velocity.set(
+                fwd.x * power * 0.25 - (impactOffset * 0.1), // Add slight curve based on impact
+                0.2 + (power * 0.05), // Lift
+                fwd.z * power * 0.25
+            );
             
-            state.velocity.set(fwd.x * speed * 0.2, lift, fwd.z * speed * 0.25);
-            
-            document.getElementById('speed-val').innerText = Math.round(speed * 10);
+            document.getElementById('speed-val').innerText = Math.round(power * 10);
             document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
         }
 
         function updateBall() {
             if(state.ballState === 'FLYING') {
                 state.velocity.y -= 0.025; // Gravity
-                state.velocity.z *= 0.995; // Drag
+                state.velocity.z *= 0.99; // Air resistance
                 ball.position.add(state.velocity);
-                ball.rotation.x -= state.velocity.z * 0.2; 
-                
-                // Camera Follow
-                const targetLook = new THREE.Vector3(ball.position.x * 0.5, ball.position.y * 0.5 + 1, ball.position.z - 5);
-                const currentLook = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).add(camera.position);
-                currentLook.lerp(targetLook, 0.05);
-                camera.lookAt(currentLook);
+                ball.rotation.x -= 0.1;
 
-                // Floor Bounce
+                // Follow Camera
+                const targetPos = new THREE.Vector3(ball.position.x * 0.3, ball.position.y * 0.5 + 2, ball.position.z + 6);
+                camera.position.lerp(targetPos, 0.1);
+                camera.lookAt(ball.position);
+
+                // Bounce
                 if(ball.position.y < 0.4) {
                     ball.position.y = 0.4;
                     state.velocity.y *= -0.6;
                 }
-                
-                // Keeper Collision
-                if(Math.abs(ball.position.z - keeperGroup.position.z) < 1 && 
-                   Math.abs(ball.position.x - keeperGroup.position.x) < 1 &&
-                   ball.position.y < 2.5) {
-                    state.velocity.z *= -0.5;
-                    AudioSys.playHit();
-                    showFeedback("SAVED!", "🧤");
+
+                // Collisions (Wall)
+                if(ball.position.z < wallGroup.position.z + 0.5 && ball.position.z > wallGroup.position.z - 0.5) {
+                    if(Math.abs(ball.position.x - wallGroup.position.x) < 2.5 && ball.position.y < 3) {
+                        state.velocity.z *= -0.5;
+                        state.velocity.y += 0.2;
+                        showFeedback("BLOCKED!");
+                    }
                 }
 
-                // Goal Check
-                if(ball.position.z <= CONFIG.goalZ && ball.position.z > CONFIG.goalZ - 2) {
+                // Collisions (Keeper)
+                if(ball.position.z < keeperMesh.position.z + 0.5 && ball.position.z > keeperMesh.position.z - 0.5) {
+                    if(Math.abs(ball.position.x - keeperMesh.position.x) < 1.0 && ball.position.y < 2.5) {
+                        state.velocity.z *= -0.5;
+                        showFeedback("SAVED!");
+                    }
+                }
+
+                // Goal
+                if(ball.position.z < CONFIG.goalZ && ball.position.z > CONFIG.goalZ - 2) {
                     if(Math.abs(ball.position.x) < CONFIG.goalWidth/2 && ball.position.y < CONFIG.goalHeight) {
                         scoreGoal();
                     }
                 }
-
-                if(ball.position.z < -40 || Math.abs(ball.position.x) > 25) {
-                    state.ballState = 'RESETTING';
-                    clearTimeout(state.ballSafetyTimer);
-                    setTimeout(resetBall, 800);
+                
+                // Miss
+                if(ball.position.z < -35 && state.ballState === 'FLYING') {
+                     state.ballState = 'RESETTING';
+                     showFeedback("MISSED");
+                     setTimeout(resetBall, 1000);
                 }
+
             } else {
                 updateAiming();
             }
         }
 
-        function showFeedback(text, emoji) {
-             const fb = document.getElementById('feedback-text');
-             fb.innerText = text;
-             document.getElementById('aim-arrow-txt').innerText = emoji;
-             document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(1)";
+        function showFeedback(txt) {
+            const el = document.getElementById('kick-feedback');
+            el.innerText = txt;
+            el.style.transform = "translate(-50%, -50%) scale(1)";
         }
 
         function scoreGoal() {
             state.score++;
             document.getElementById('score-val').innerText = state.score;
+            playSound('GOAL');
             state.ballState = 'RESETTING';
             clearTimeout(state.ballSafetyTimer);
-            AudioSys.playGoal();
-            showFeedback("GOAL!!!", "⚽");
+            showFeedback("GOAL!!!!");
             setTimeout(() => {
                 document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
                 resetBall();
-            }, 2500);
+            }, 2000);
         }
 
         function updateKeeper() {
-            if(state.ballState === 'FLYING' && ball.position.z < -5) {
-                const targetX = Math.max(-CONFIG.goalWidth/2 + 1, Math.min(CONFIG.goalWidth/2 - 1, ball.position.x));
-                keeperGroup.position.x += (targetX - keeperGroup.position.x) * 0.15;
+            // Simple AI: Follow ball x
+            if(state.ballState === 'FLYING' && ball.position.z < -10) {
+                 keeperMesh.position.x += (ball.position.x - keeperMesh.position.x) * 0.1;
             } else {
-                keeperGroup.position.x = Math.sin(Date.now() * 0.002) * 3;
+                keeperMesh.position.x = Math.sin(Date.now()*0.003) * 2; 
             }
         }
 
-        function checkKickGesture(footState) {
-            // Simple velocity check: Is foot moving fast?
-            const speed = Math.sqrt(footState.vx*footState.vx + footState.vy*footState.vy);
-            
-            // Check direction: Must be swinging UP or FORWARD (negative Y in screen space usually)
-            // We'll mostly rely on raw speed + proximity to bottom of screen (swinging phase)
-            if(speed > CONFIG.kickThreshold) {
-                triggerKick(speed);
-            }
-        }
-
-        function updateFootTracking(landmark, footState) {
+        function updateFootTracking(landmark, footState, mesh) {
             if(state.phase !== 'PLAYING') return;
             const scale = Math.max(state.playerScale, 0.1);
             
+            // Map 2D landmarks to 3D world space
+            // NOTE: We invert X because selfie camera is mirrored
             const relX = (landmark.x - state.hipCenter.x) / scale * -1.0; 
             const relY = (landmark.y - state.hipCenter.y) / scale; 
-            const targetX = relX * 4.0; 
-            const targetY = (relY * -4.0) + 2.5; 
+            
+            // Tuned Mapping
+            const targetX = relX * 3.5; 
+            const targetY = (relY * -3.5) + 2.0; 
 
-            const vx = (targetX - footState.x) * 60;
-            const vy = (targetY - footState.y) * 60;
+            // Physics Smoothing
+            const vx = (targetX - footState.x) * 40;
+            const vy = (targetY - footState.y) * 40;
+            const speed = Math.sqrt(vx*vx + vy*vy);
 
-            footState.x = targetX;
-            footState.y = targetY;
+            footState.x += (targetX - footState.x) * 0.5;
+            footState.y += (targetY - footState.y) * 0.5;
             footState.vx = vx;
             footState.vy = vy;
 
-            // Trigger Check
-            checkKickGesture(footState);
+            // Visual Update
+            mesh.position.set(footState.x, footState.y, -1.8); // Place slightly in front of ball (-2.0)
+
+            // KICK DETECTION LOGIC
+            // 1. Distance Check: Is foot visually close to ball?
+            const dx = Math.abs(footState.x - ball.position.x);
+            const dy = Math.abs(footState.y - ball.position.y);
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            // 2. Velocity Check: Is foot moving fast?
+            // 3. Direction Check: Must be swinging (y < 1.0 ensures we are low)
+            if(dist < CONFIG.contactDist && speed > CONFIG.kickThreshold && footState.y < 1.0) {
+                // Flash foot white
+                mesh.material.color.setHex(0xffffff);
+                setTimeout(() => mesh.material.color.setHex(0xe74c3c), 100);
+                triggerKick(speed, footState.x);
+            }
+            
+            // Debug text
+            if(speed > 1) {
+                document.getElementById('debug-feet').innerText = `Speed: ${speed.toFixed(1)} | Dist: ${dist.toFixed(2)}`;
+            }
         }
 
         function startCountdown() {
             state.phase = 'COUNTDOWN';
-            const setupMsg = document.getElementById('setup-msg');
-            const countTxt = document.getElementById('countdown-txt');
+            document.getElementById('setup-msg').innerText = "READY!";
+            document.getElementById('countdown-txt').style.display = 'block';
             document.getElementById('guide-reticle').style.display = 'none';
-            setupMsg.innerText = "READY!";
-            countTxt.style.display = 'block';
+            
             let count = 3;
-            countTxt.innerText = count;
-            AudioSys.playTone(400, 'sine', 0.1);
             const interval = setInterval(() => {
+                document.getElementById('countdown-txt').innerText = count;
                 count--;
-                if(count > 0) {
-                    countTxt.innerText = count;
-                    AudioSys.playTone(400, 'sine', 0.1);
-                } else if(count === 0) {
-                    countTxt.innerText = "GO!";
-                    AudioSys.playTone(800, 'square', 0.3);
-                } else {
+                if(count < 0) {
                     clearInterval(interval);
                     document.getElementById('setup-overlay').style.display = 'none';
                     state.phase = 'PLAYING';
-                    document.getElementById('ui-layer').classList.add('game-active'); 
-                    document.getElementById('controls-hint').style.display = 'block';
-                    document.getElementById('aim-hud-left').style.display = 'block';
+                    // Enable camera motion
                     const tween = setInterval(() => {
                         camera.position.lerp(defaultCamPos, 0.05);
                         camera.lookAt(defaultLookAt);
@@ -552,31 +506,28 @@
             if(state.phase !== 'SETUP') return;
             const shoulderWidth = Math.abs(landmarks[11].x - landmarks[12].x);
             const feetVisible = landmarks[27].visibility > 0.6 && landmarks[28].visibility > 0.6;
-            const hipX = (landmarks[23].x + landmarks[24].x) / 2;
-            const isCentered = Math.abs(hipX - 0.5) < 0.15; 
-            const statusTxt = document.getElementById('guide-status');
-            const guide = document.getElementById('guide-reticle');
             
-            if(!isCentered) {
-                guide.className = 'guide-bad';
-                statusTxt.innerText = hipX > 0.5 ? "MOVE LEFT ⬅" : "➡ MOVE RIGHT";
-                statusTxt.style.color = '#e74c3c';
-            } else if (!feetVisible) {
-                guide.className = 'guide-bad';
-                statusTxt.innerText = "SHOW FEET";
-                statusTxt.style.color = '#f1c40f';
-            } else {
-                guide.className = 'guide-good';
-                statusTxt.innerText = "HOLD STILL...";
-                statusTxt.style.color = '#2ecc71';
+            const guide = document.getElementById('guide-reticle');
+            const status = document.getElementById('guide-status');
+            
+            // Simple validation: Feet must be visible and player relatively centered
+            if(feetVisible && shoulderWidth < 0.5) {
+                guide.style.borderColor = "#2ecc71";
+                status.innerText = "HOLD STILL...";
                 state.setupTimer++;
-                if(state.setupTimer > 50) startCountdown();
+                if(state.setupTimer > 60) startCountdown();
+            } else {
+                state.setupTimer = 0;
+                guide.style.borderColor = "#e74c3c";
+                status.innerText = !feetVisible ? "SHOW FEET" : "STEP BACK";
             }
         }
 
         function onResults(results) {
             if (!results.poseLandmarks) return;
             const lm = results.poseLandmarks;
+            
+            // Update Scale & Center
             const shoulderWidth = Math.abs(lm[11].x - lm[12].x);
             state.playerScale = (state.playerScale * 0.95) + (shoulderWidth * 0.05);
             const hipCX = (lm[23].x + lm[24].x) / 2;
@@ -587,8 +538,8 @@
             if(state.phase === 'SETUP') {
                 checkAutoStart(lm);
             } else if(state.phase === 'PLAYING') {
-                updateFootTracking(lm[27], state.leftFoot);
-                updateFootTracking(lm[28], state.rightFoot);
+                updateFootTracking(lm[27], state.leftFoot, leftFootMesh);
+                updateFootTracking(lm[28], state.rightFoot, rightFootMesh);
             }
         }
 
@@ -604,12 +555,10 @@
 
         const startBtn = document.getElementById('start-btn');
         startBtn.addEventListener('click', () => {
-            if(audioCtx.state === 'suspended') audioCtx.resume();
-            state.audioEnabled = true;
             cameraUtils.start().then(() => {
                 document.getElementById('start-screen').classList.add('hidden');
                 document.getElementById('setup-overlay').style.display = 'block';
-                document.getElementById('guide-reticle').style.display = 'block'; 
+                document.getElementById('guide-reticle').style.display = 'block';
                 state.phase = 'SETUP';
             });
             startBtn.innerText = "Starting...";
@@ -621,11 +570,10 @@
             requestAnimationFrame(animate);
             updateBall();
             updateKeeper();
-            updateTrail();
             renderer.render(scene, camera);
         }
         animate();
-        
+
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -634,3 +582,4 @@
     </script>
 </body>
 </html>
+    
