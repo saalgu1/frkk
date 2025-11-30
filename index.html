@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -88,7 +89,8 @@
         #countdown-txt { font-size: 180px; font-weight: bold; display: none; margin-top: -20px; color: white;}
 
         #kick-feedback {
-            position: absolute; top: 35%; left: 50%;
+            /* Moved WAY up so it doesn't block the goal view in the center */
+            position: absolute; top: 20%; left: 50%;
             transform: translate(-50%, -50%) scale(0);
             font-size: 90px; color: #fff;
             text-shadow: 0 0 20px #f1c40f, 4px 4px 0 #c0392b;
@@ -123,8 +125,8 @@
     <div id="game-container"></div>
     
     <div id="kick-feedback">
-        <span id="feedback-text">POWER SHOT!</span>
-        <div id="aim-arrow">⬆</div>
+        <span id="feedback-text">GOAL!!!</span>
+        <div id="aim-arrow"></div>
     </div>
 
     <div id="ui-layer">
@@ -235,8 +237,11 @@
         scene.fog = new THREE.Fog(0x1a1a2e, 10, 60);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
-        camera.position.set(0, 2, 7); 
-        camera.lookAt(0, 0.5, -5);
+        // Default camera pos
+        const defaultCamPos = new THREE.Vector3(0, 2, 7);
+        const defaultLookAt = new THREE.Vector3(0, 0.5, -5);
+        camera.position.copy(defaultCamPos);
+        camera.lookAt(defaultLookAt);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -409,11 +414,11 @@
         scene.add(kickZone);
 
         // --- NEW: Trail Renderer ---
-        const trailSize = 40;
+        const trailSize = 50;
         const trailGeo = new THREE.BufferGeometry();
         const trailPos = new Float32Array(trailSize * 3);
         trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
-        const trailMat = new THREE.LineBasicMaterial({ color: 0x3498db, opacity: 0.5, transparent: true, linewidth: 2 });
+        const trailMat = new THREE.LineBasicMaterial({ color: 0x3498db, opacity: 0.8, transparent: true, linewidth: 3 });
         const trailLine = new THREE.Line(trailGeo, trailMat);
         scene.add(trailLine);
         trailLine.frustumCulled = false;
@@ -523,6 +528,15 @@
             
             // Randomize Wall Position slightly
             wallGroup.position.x = (Math.random() * 4) - 2;
+
+            // Reset Camera smoothly
+            const tween = setInterval(() => {
+                camera.position.lerp(defaultCamPos, 0.1);
+                const currentLookAt = new THREE.Vector3(0,0,-5);
+                currentLookAt.lerp(defaultLookAt, 0.1); // Approximation
+                camera.lookAt(defaultLookAt);
+                if(camera.position.distanceTo(defaultCamPos) < 0.1) clearInterval(tween);
+            }, 16);
         }
         resetBall();
 
@@ -552,25 +566,17 @@
 
             state.velocity.set(curve, lift, -fwd);
 
-            // UI
+            // UI - HIDE FEEDBACK to see ball flight
             const speedKm = Math.round(power * 10); 
             document.getElementById('speed-val').innerText = speedKm;
             
-            const feedbackText = document.getElementById('feedback-text');
-            const aimArrow = document.getElementById('aim-arrow');
-            feedbackText.innerText = speedKm > 100 ? "ROCKET!" : "KICK!";
-            
-            if(curve < -0.4) aimArrow.innerText = "⬅ Curve Left";
-            else if(curve > 0.4) aimArrow.innerText = "Curve Right ➡";
-            else aimArrow.innerText = "⬆ Center";
-            
-            const fbContainer = document.getElementById('kick-feedback');
-            fbContainer.style.transform = "translate(-50%, -50%) scale(1)";
-            setTimeout(() => { fbContainer.style.transform = "translate(-50%, -50%) scale(0)"; }, 1500);
-
+            // Do NOT show the big overlay yet. Just update the bar.
             const bar = document.getElementById('p-bar');
             document.getElementById('p-meter-cont').style.display = 'block';
             bar.style.width = Math.min((speedKm / 120) * 100, 100) + "%";
+
+            // Hide previous feedback
+            document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
         }
 
         function checkCollision(pos, radius, obstaclePos, obstacleW, obstacleH, obstacleD) {
@@ -597,6 +603,20 @@
                 ball.rotation.x -= state.velocity.z * 0.2; 
                 ball.rotation.z -= state.velocity.x * 0.2; 
 
+                // --- CAMERA TRACKING ---
+                // Subtly look towards the ball without moving the camera position too much
+                // This keeps the ball in frame
+                const targetLook = new THREE.Vector3(
+                    ball.position.x * 0.3, // Dampen X tracking
+                    Math.max(0, ball.position.y * 0.4 + 1.0), // Look slightly above ball
+                    ball.position.z * 0.8 - 5 // Lead the ball slightly
+                );
+                // Softly rotate camera to face ball
+                const currentLook = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).add(camera.position);
+                currentLook.lerp(targetLook, 0.05);
+                camera.lookAt(currentLook);
+
+
                 // Ground Bounce
                 if(ball.position.y < 0.4) {
                     ball.position.y = 0.4;
@@ -605,10 +625,6 @@
                 }
 
                 // 1. Check Wall Collision
-                // Wall group position + local dummy positions
-                // Simplified: Check against the bounding box of the whole wall group
-                // Group Pos: wallGroup.position.x, y=0, z=CONFIG.wallZ
-                // Dummies are approx +/- 0.8 width total approx 2.5
                 if(ball.position.z < (CONFIG.wallZ + 0.5) && ball.position.z > (CONFIG.wallZ - 0.5)) {
                     // Check Width
                     const distToWallCenter = Math.abs(ball.position.x - wallGroup.position.x);
@@ -617,13 +633,11 @@
                         state.velocity.z *= -0.5; // Bounce back
                         state.velocity.y += 0.2;
                         AudioSys.playHit();
-                        document.getElementById('feedback-text').innerText = "BLOCKED!";
-                        document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(1)";
+                        showFeedback("BLOCKED!", "");
                     }
                 }
 
                 // 2. Check Keeper Collision
-                // Keeper moves on X at z = goalZ + 1
                 const kx = keeperGroup.position.x;
                 const ky = keeperGroup.position.y;
                 const kz = keeperGroup.position.z;
@@ -637,8 +651,7 @@
                     state.velocity.z *= -0.5;
                     state.velocity.x += (Math.random()-0.5);
                     AudioSys.playHit();
-                    document.getElementById('feedback-text').innerText = "SAVED!";
-                    document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(1)";
+                    showFeedback("SAVED!", "");
                 }
 
                 // 3. Goal Check
@@ -658,7 +671,17 @@
                 // Idle animation
                 const s = 1 + Math.sin(Date.now() * 0.005) * 0.1;
                 kickZone.scale.set(s, s, 1);
+                
+                // Reset camera look slowly if idle
+                // handled in resetBall
             }
+        }
+
+        function showFeedback(text, subtext) {
+             const fb = document.getElementById('feedback-text');
+             fb.innerText = text;
+             document.getElementById('aim-arrow').innerText = subtext;
+             document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(1)";
         }
 
         function scoreGoal() {
@@ -670,10 +693,7 @@
             AudioSys.playGoal();
             explodeParticles(ball.position.x, ball.position.y, ball.position.z);
 
-            const fb = document.getElementById('feedback-text');
-            fb.innerText = "GOAL!!!";
-            document.getElementById('aim-arrow').innerText = "⚽";
-            document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(1)";
+            showFeedback("GOAL!!!", "⚽");
             
             setTimeout(() => {
                 document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
