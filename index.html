@@ -30,11 +30,21 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; pointer-events: none;
             display: flex; flex-direction: column; justify-content: space-between;
+            transition: all 0.5s;
+        }
+
+        /* Scaled HUD for distance viewing */
+        #ui-layer.game-active .hud-top {
+            transform: scale(1.4); /* Make top UI 40% bigger during game */
+            transform-origin: top center;
+            margin-top: 10px;
         }
 
         .hud-top {
             padding: 20px; display: flex; justify-content: space-between; color: white; text-transform: uppercase;
             text-shadow: 0 0 10px rgba(0,0,0,0.8);
+            transition: transform 0.5s;
+            width: 100%; box-sizing: border-box;
         }
 
         .score-box {
@@ -86,15 +96,15 @@
             text-align: center; color: white; text-shadow: 0 2px 20px rgba(0,0,0,0.8);
             display: none; width: 100%; z-index: 50;
         }
-        #setup-msg { font-size: 50px; color: #f1c40f; font-weight: 600; }
-        #countdown-txt { font-size: 180px; font-weight: bold; display: none; margin-top: -20px; color: white;}
+        #setup-msg { font-size: 60px; color: #f1c40f; font-weight: 600; white-space: nowrap; }
+        #countdown-txt { font-size: 200px; font-weight: bold; display: none; margin-top: -20px; color: white;}
 
         /* --- NEW: Guide Overlay (High Visibility) --- */
         #guide-reticle {
             position: absolute; top: 50%; left: 50%;
             width: 300px; height: 550px;
             transform: translate(-50%, -45%);
-            border: 6px dashed #00ffff; /* Cyan for high contrast */
+            border: 8px dashed #00ffff; /* Thicker border */
             border-radius: 30px;
             box-sizing: border-box;
             pointer-events: none;
@@ -105,14 +115,14 @@
         }
         #guide-reticle::before {
             content: "FRAME YOUR BODY";
-            position: absolute; top: -50px; width: 100%; text-align: center;
-            color: #00ffff; font-size: 36px; text-shadow: 0 2px 4px black;
-            background: rgba(0,0,0,0.5); padding: 5px; border-radius: 5px;
+            position: absolute; top: -60px; width: 140%; left: -20%; text-align: center;
+            color: #00ffff; font-size: 42px; text-shadow: 0 2px 4px black;
+            background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px;
         }
         /* Dynamic Status Text inside box */
         #guide-status {
             position: absolute; bottom: 20px; width: 100%; 
-            text-align: center; font-size: 40px; color: white;
+            text-align: center; font-size: 48px; color: white;
             text-shadow: 0 2px 10px black; font-weight: bold;
         }
 
@@ -121,21 +131,21 @@
         
         #warning-msg {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(231, 76, 60, 0.9); color: white; padding: 20px 40px;
-            font-size: 40px; border-radius: 10px; display: none; text-align: center;
-            border: 2px solid white; z-index: 60;
+            background: rgba(231, 76, 60, 0.95); color: white; padding: 30px 60px;
+            font-size: 50px; border-radius: 20px; display: none; text-align: center;
+            border: 4px solid white; z-index: 60; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
         }
 
         #kick-feedback {
-            position: absolute; top: 20%; left: 50%;
+            position: absolute; top: 30%; left: 50%;
             transform: translate(-50%, -50%) scale(0);
-            font-size: 90px; color: #fff;
-            text-shadow: 0 0 20px #f1c40f, 4px 4px 0 #c0392b;
+            font-size: 110px; color: #fff;
+            text-shadow: 0 0 20px #f1c40f, 6px 6px 0 #c0392b;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none; white-space: nowrap; text-align: center;
             z-index: 20;
         }
-        #aim-arrow { font-size: 50px; display: block; margin-top: 5px; color: #f1c40f; text-shadow: 2px 2px 0 #000; }
+        #aim-arrow { font-size: 60px; display: block; margin-top: 5px; color: #f1c40f; text-shadow: 2px 2px 0 #000; }
 
         #debug-info {
             position: absolute; bottom: 10px; left: 10px;
@@ -203,6 +213,7 @@
     <script>
         /**
          * FREE KICK PRO - ULTIMATE EDITION
+         * v3: Distance Visibility Fix
          */
 
         const CONFIG = {
@@ -278,10 +289,15 @@
         scene.fog = new THREE.Fog(0x1a1a2e, 10, 60);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
-        const defaultCamPos = new THREE.Vector3(0, 2, 7);
-        const defaultLookAt = new THREE.Vector3(0, 0.5, -5);
-        camera.position.copy(defaultCamPos);
-        camera.lookAt(defaultLookAt);
+        // VISIBILITY FIX: Move camera significantly closer (was z=7, now z=3.5) to act as a zoom for the phone screen
+        const defaultCamPos = new THREE.Vector3(0, 1.4, 3.5); 
+        const defaultLookAt = new THREE.Vector3(0, 0.6, -8);
+        
+        // Initial setup pose (wider to help with framing body)
+        const setupCamPos = new THREE.Vector3(0, 2, 7);
+        
+        camera.position.copy(setupCamPos);
+        camera.lookAt(0, 0.5, -5);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -297,14 +313,9 @@
         dirLight.castShadow = true;
         dirLight.shadow.mapSize.width = 2048;
         dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.camera.near = 0.5;
-        dirLight.shadow.camera.far = 50;
-        dirLight.shadow.camera.left = -20;
-        dirLight.shadow.camera.right = 20;
-        dirLight.shadow.camera.top = 20;
-        dirLight.shadow.camera.bottom = -20;
         scene.add(dirLight);
 
+        // --- ASSETS ---
         function createStadiumLight(x, z) {
             const poleGeo = new THREE.CylinderGeometry(0.2, 0.2, 15);
             const poleMat = new THREE.MeshLambertMaterial({color: 0x555555});
@@ -420,7 +431,6 @@
         kickZone.position.set(0, 0.05, -2);
         scene.add(kickZone);
 
-        // --- UPDATED: PLAYER STANDING ZONE ---
         const zoneGeo = new THREE.RingGeometry(0.8, 1.0, 32);
         const zoneMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
         const playerZone = new THREE.Mesh(zoneGeo, zoneMat);
@@ -428,16 +438,18 @@
         playerZone.position.set(0, 0.02, -1.0); 
         scene.add(playerZone);
 
-        // --- NEW: AIMING SYSTEM (POOL STYLE) ---
-        // 1. Aim Line
-        const aimGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-10)]);
-        const aimMat = new THREE.LineDashedMaterial({ color: 0x00ffff, dashSize: 0.5, gapSize: 0.2, linewidth: 2 });
-        const aimLine = new THREE.Line(aimGeo, aimMat);
-        aimLine.computeLineDistances();
-        scene.add(aimLine);
-        aimLine.visible = false;
+        // --- VISIBILITY FIX: REPLACED THIN LINE WITH THICK CYLINDER ---
+        // Cylinder that acts as a laser sight
+        const aimStickGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 8); // Thick laser beam
+        const aimStickMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.6 });
+        const aimStick = new THREE.Mesh(aimStickGeo, aimStickMat);
+        // We rotate it 90deg so the cylinder points along Z by default, easier to transform
+        aimStick.geometry.rotateX(-Math.PI / 2); 
+        aimStick.geometry.translate(0, 0, 0.5); // Move origin to start so scaling grows forward
+        scene.add(aimStick);
+        aimStick.visible = false;
 
-        // 2. Trajectory Ghost
+        // Trajectory Ghost
         const ghostBallGeo = new THREE.SphereGeometry(0.2, 16, 16);
         const ghostBallMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5, wireframe: true });
         const ghostBall = new THREE.Mesh(ghostBallGeo, ghostBallMat);
@@ -520,19 +532,15 @@
         }
         particleSystem.visible = false;
 
-        // --- UPDATED: HOLOGRAPHIC FEET ---
-        // Using wireframe to look "Holographic" and "AR"
         const footGeo = new THREE.SphereGeometry(0.25, 12, 12);
         const footMatL = new THREE.MeshBasicMaterial({ color: 0xe74c3c, wireframe: true, transparent: true, opacity: 0.5 });
         const footMatR = new THREE.MeshBasicMaterial({ color: 0x3498db, wireframe: true, transparent: true, opacity: 0.5 });
         
         const leftFootMesh = new THREE.Mesh(footGeo, footMatL);
         const rightFootMesh = new THREE.Mesh(footGeo, footMatR);
-        // Important: renderOrder to make sure they are seen
         leftFootMesh.renderOrder = 999;
         rightFootMesh.renderOrder = 999;
         
-        // Add glow inner sphere
         const innerFootGeo = new THREE.SphereGeometry(0.1, 8, 8);
         leftFootMesh.add(new THREE.Mesh(innerFootGeo, new THREE.MeshBasicMaterial({color: 0xffffff})));
         rightFootMesh.add(new THREE.Mesh(innerFootGeo, new THREE.MeshBasicMaterial({color: 0xffffff})));
@@ -540,7 +548,6 @@
         scene.add(leftFootMesh);
         scene.add(rightFootMesh);
         
-        // Always visible in AR view, just moved off screen if not tracked
         leftFootMesh.visible = false;
         rightFootMesh.visible = false;
 
@@ -554,16 +561,17 @@
             kickZone.material.opacity = 0.6;
             kickZone.scale.set(1,1,1);
             wallGroup.position.x = (Math.random() * 4) - 2;
-            const tween = setInterval(() => {
-                camera.position.lerp(defaultCamPos, 0.1);
-                const currentLookAt = new THREE.Vector3(0,0,-5);
-                currentLookAt.lerp(defaultLookAt, 0.1);
-                camera.lookAt(defaultLookAt);
-                if(camera.position.distanceTo(defaultCamPos) < 0.1) clearInterval(tween);
-            }, 16);
             
-            // Re-show feet for next round
+            // Camera Zoom Animation: Return to "Close Up" Game Mode
             if(state.phase === 'PLAYING') {
+                const tween = setInterval(() => {
+                    camera.position.lerp(defaultCamPos, 0.05);
+                    const currentLookAt = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).add(camera.position);
+                    const targetLook = defaultLookAt.clone();
+                    currentLookAt.lerp(targetLook, 0.05);
+                    camera.lookAt(targetLook);
+                    if(camera.position.distanceTo(defaultCamPos) < 0.1) clearInterval(tween);
+                }, 16);
                 leftFootMesh.visible = true;
                 rightFootMesh.visible = true;
             }
@@ -575,7 +583,7 @@
             AudioSys.playKick();
             state.ballState = 'FLYING';
             kickZone.material.opacity = 0; 
-            aimLine.visible = false;
+            aimStick.visible = false;
             ghostBall.visible = false;
 
             state.ballSafetyTimer = setTimeout(resetBall, 4000);
@@ -596,10 +604,9 @@
             document.getElementById('kick-feedback').style.transform = "translate(-50%, -50%) scale(0)";
         }
 
-        // --- NEW: AIMING LOGIC ---
         function updateAiming() {
             if(state.ballState !== 'IDLE' || state.phase !== 'PLAYING') {
-                aimLine.visible = false;
+                aimStick.visible = false;
                 ghostBall.visible = false;
                 return;
             }
@@ -628,40 +635,32 @@
                 leftFootMesh.material.color.setHex(0xe74c3c);
                 leftFootMesh.material.opacity = 0.3;
             } else {
-                aimLine.visible = false;
+                aimStick.visible = false;
                 ghostBall.visible = false;
                 leftFootMesh.material.opacity = 0.5;
                 rightFootMesh.material.opacity = 0.5;
                 return;
             }
 
-            // Calculate Aim Vector based on foot position relative to ball
-            // If foot is Left of ball (negative x relative), ball goes Right (positive x)
             const footX = activeFoot.position.x;
             const relativeX = footX - ball.position.x; 
-            
-            // This multiplier mimics the "Kick Logic" in triggerKick
-            // impactOffset = relativeX * -2.0
-            // curve = impactOffset * 0.6  => relativeX * -1.2
             const predictedCurve = relativeX * -1.2;
-            
-            // Visual scale
             const targetZ = CONFIG.goalZ;
-            const targetX = ball.position.x + (predictedCurve * (Math.abs(targetZ)/2.5)); // Approx landing spot
+            const targetX = ball.position.x + (predictedCurve * (Math.abs(targetZ)/2.5));
 
-            // Update Aim Line
-            const positions = aimLine.geometry.attributes.position.array;
-            positions[0] = ball.position.x;
-            positions[1] = ball.position.y;
-            positions[2] = ball.position.z;
+            // Logic for Stick
+            // Stick origin is at ball
+            aimStick.position.copy(ball.position);
             
-            positions[3] = targetX;
-            positions[4] = CONFIG.goalHeight / 2; // Aim for middle height approx
-            positions[5] = targetZ;
+            // Stick points to target
+            const targetVec = new THREE.Vector3(targetX, CONFIG.goalHeight/2, targetZ);
+            aimStick.lookAt(targetVec); 
             
-            aimLine.geometry.attributes.position.needsUpdate = true;
-            aimLine.computeLineDistances();
-            aimLine.visible = true;
+            // Scaling the stick length to reach target (roughly)
+            const length = ball.position.distanceTo(targetVec);
+            aimStick.scale.set(1, 1, length); // Scale Z (which we rotated to be length)
+            
+            aimStick.visible = true;
 
             // Update Ghost Ball (Target indicator)
             ghostBall.position.set(targetX, CONFIG.goalHeight/2, targetZ);
@@ -818,6 +817,13 @@
                     clearInterval(interval);
                     document.getElementById('setup-overlay').style.display = 'none';
                     state.phase = 'PLAYING';
+                    document.getElementById('ui-layer').classList.add('game-active'); // Enable large UI
+                    // Animate camera to Close Up Mode
+                    const tween = setInterval(() => {
+                        camera.position.lerp(defaultCamPos, 0.05);
+                        camera.lookAt(defaultLookAt);
+                        if(camera.position.distanceTo(defaultCamPos) < 0.1) clearInterval(tween);
+                    }, 16);
                     leftFootMesh.visible = true;
                     rightFootMesh.visible = true;
                 }
