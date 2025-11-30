@@ -88,6 +88,33 @@
         #setup-msg { font-size: 50px; color: #f1c40f; font-weight: 600; }
         #countdown-txt { font-size: 180px; font-weight: bold; display: none; margin-top: -20px; color: white;}
 
+        /* --- NEW: Guide Overlay --- */
+        #guide-reticle {
+            position: absolute; top: 50%; left: 50%;
+            width: 300px; height: 500px;
+            transform: translate(-50%, -45%); /* Slightly higher for head room */
+            border: 4px dashed rgba(255,255,255,0.3);
+            border-radius: 30px;
+            box-sizing: border-box;
+            pointer-events: none;
+            display: none;
+            transition: all 0.3s;
+        }
+        #guide-reticle::before {
+            content: "STAND HERE";
+            position: absolute; top: -40px; width: 100%; text-align: center;
+            color: white; font-size: 30px; text-shadow: 0 2px 4px black;
+        }
+        .guide-bad { border-color: #e74c3c !important; box-shadow: 0 0 20px rgba(231, 76, 60, 0.3); }
+        .guide-good { border-color: #2ecc71 !important; box-shadow: 0 0 30px rgba(46, 204, 113, 0.5); background: rgba(46,204,113,0.1); }
+        
+        #warning-msg {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(231, 76, 60, 0.9); color: white; padding: 20px 40px;
+            font-size: 40px; border-radius: 10px; display: none; text-align: center;
+            border: 2px solid white;
+        }
+
         #kick-feedback {
             /* Moved WAY up so it doesn't block the goal view in the center */
             position: absolute; top: 20%; left: 50%;
@@ -128,6 +155,9 @@
         <span id="feedback-text">GOAL!!!</span>
         <div id="aim-arrow"></div>
     </div>
+    
+    <div id="warning-msg">RETURN TO CENTER!</div>
+    <div id="guide-reticle"></div>
 
     <div id="ui-layer">
         <div class="hud-top">
@@ -145,12 +175,12 @@
         <div id="start-screen" class="center-card">
             <h1>FREE KICK PRO</h1>
             <p style="font-size: 60px; margin: 10px;">⚽</p>
-            <p>1. Enable Camera & Sound<br>2. Step Back (2-3m)<br>3. Beat the Keeper & The Wall</p>
+            <p>1. Enable Camera & Sound<br>2. Stand inside the Box<br>3. Beat the Keeper & The Wall</p>
             <button id="start-btn" disabled>Loading Engine...</button>
         </div>
 
         <div id="setup-overlay">
-            <div id="setup-msg">STEP BACK TO START</div>
+            <div id="setup-msg">ALIGN YOUR BODY</div>
             <div id="countdown-txt">3</div>
         </div>
         
@@ -160,7 +190,7 @@
     <script>
         /**
          * FREE KICK PRO - ULTIMATE EDITION
-         * Features: Goalkeeper AI, Defensive Wall, Particles, Trail Renderer, Synth Audio
+         * Features: Goalkeeper AI, Defensive Wall, Particles, Trail Renderer, Synth Audio, Alignment Guide
          */
 
         const CONFIG = {
@@ -183,7 +213,8 @@
             hipCenter: {x: 0.5, y: 0.5},
             setupTimer: 0,
             ballSafetyTimer: null,
-            audioEnabled: false
+            audioEnabled: false,
+            outOfBounds: false
         };
 
         // --- AUDIO SYSTEM (Web Audio API) ---
@@ -227,6 +258,9 @@
             },
             playHit: () => {
                 AudioSys.playTone(800, 'square', 0.1, 0.1); // Metal/Wood hit
+            },
+            playError: () => {
+                AudioSys.playTone(150, 'sawtooth', 0.3, 0.1);
             }
         };
 
@@ -405,13 +439,26 @@
         const d3=new THREE.Mesh(dotGeo,dotMat); d3.position.set(0,0.35,0); ball.add(d3);
         scene.add(ball);
 
-        // Kick Zone Ring
+        // Kick Zone Ring (The "Ball" target)
         const ringGeo = new THREE.RingGeometry(0.5, 0.6, 32);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
         const kickZone = new THREE.Mesh(ringGeo, ringMat);
         kickZone.rotation.x = -Math.PI / 2;
         kickZone.position.set(0, 0.05, -2);
         scene.add(kickZone);
+
+        // --- NEW: PLAYER STANDING ZONE (3D) ---
+        // This visualizes on the floor where the user should be
+        const zoneGeo = new THREE.RingGeometry(0.8, 1.0, 32);
+        const zoneMat = new THREE.MeshBasicMaterial({ color: 0x2ecc71, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+        const playerZone = new THREE.Mesh(zoneGeo, zoneMat);
+        playerZone.rotation.x = -Math.PI / 2;
+        // The user stands "behind" the screen effectively, but we project the feet to Z=-1.5. 
+        // So the "Standing Zone" should be around Z=1 to feel like it's under the camera/player.
+        // Actually, since we project feet to Z=-1.5, let's put the zone there.
+        playerZone.position.set(0, 0.02, -1.0); 
+        scene.add(playerZone);
+
 
         // --- NEW: Trail Renderer ---
         const trailSize = 50;
@@ -543,7 +590,7 @@
         // --- Physics Logic ---
 
         function triggerKick(speed, footX, swingVelocityX) {
-            if(state.ballState !== 'IDLE') return;
+            if(state.ballState !== 'IDLE' || state.outOfBounds) return;
 
             AudioSys.playKick();
             state.ballState = 'FLYING';
@@ -672,8 +719,9 @@
                 const s = 1 + Math.sin(Date.now() * 0.005) * 0.1;
                 kickZone.scale.set(s, s, 1);
                 
-                // Reset camera look slowly if idle
-                // handled in resetBall
+                // Pulse the Player Zone
+                const ps = 1 + Math.sin(Date.now() * 0.003) * 0.05;
+                playerZone.scale.set(ps, ps, 1);
             }
         }
 
@@ -723,7 +771,7 @@
             }
         }
 
-        // --- STABILIZED TRACKING ---
+        // --- STABILIZED TRACKING & POSITION CHECK ---
 
         function updateFootTracking(landmark, footState, mesh) {
             if(state.phase !== 'PLAYING') return;
@@ -769,6 +817,7 @@
             state.phase = 'COUNTDOWN';
             const setupMsg = document.getElementById('setup-msg');
             const countTxt = document.getElementById('countdown-txt');
+            document.getElementById('guide-reticle').style.display = 'none'; // Hide guide
             
             setupMsg.innerText = "READY!";
             countTxt.style.display = 'block';
@@ -795,16 +844,48 @@
             }, 1000);
         }
 
+        function checkPlayerPosition(landmarks) {
+            if(state.phase !== 'PLAYING') return;
+            
+            const hipX = (landmarks[23].x + landmarks[24].x) / 2;
+            // Mirror logic: 0.5 is center. > 0.6 is left (user's left, screen's right), < 0.4 is right.
+            const isCentered = Math.abs(hipX - 0.5) < 0.2; // 20% margin of error
+            
+            const warningEl = document.getElementById('warning-msg');
+            
+            if (!isCentered) {
+                state.outOfBounds = true;
+                warningEl.style.display = 'block';
+                playerZone.material.color.setHex(0xe74c3c); // Red zone
+            } else {
+                state.outOfBounds = false;
+                warningEl.style.display = 'none';
+                playerZone.material.color.setHex(0x2ecc71); // Green zone
+            }
+        }
+
         function checkAutoStart(landmarks) {
             if(state.phase !== 'SETUP') return;
 
             const shoulderWidth = Math.abs(landmarks[11].x - landmarks[12].x);
             const feetVisible = landmarks[27].visibility > 0.6 && landmarks[28].visibility > 0.6;
-            const playerIsFar = shoulderWidth < 0.45; 
+            const playerIsFar = shoulderWidth < 0.45 && shoulderWidth > 0.15; // Range check
+            
+            const hipX = (landmarks[23].x + landmarks[24].x) / 2;
+            const isCentered = Math.abs(hipX - 0.5) < 0.1; // Strict centering for setup
+            
+            const guide = document.getElementById('guide-reticle');
+            const setupMsg = document.getElementById('setup-msg');
 
-            if(feetVisible && playerIsFar) {
+            // Guide UI logic
+            if (isCentered && playerIsFar) {
+                guide.className = 'guide-good';
+            } else {
+                guide.className = 'guide-bad';
+            }
+
+            if(feetVisible && playerIsFar && isCentered) {
                 state.setupTimer++;
-                const setupMsg = document.getElementById('setup-msg');
                 if(state.setupTimer > 50) { 
                     startCountdown();
                 } else {
@@ -813,10 +894,10 @@
                 }
             } else {
                 state.setupTimer = 0;
-                const setupMsg = document.getElementById('setup-msg');
-                if(!playerIsFar) setupMsg.innerText = "STEP BACK";
-                else if(!feetVisible) setupMsg.innerText = "SHOW FEET";
                 setupMsg.style.color = "#f1c40f"; 
+                if(!feetVisible) setupMsg.innerText = "SHOW FEET";
+                else if(!playerIsFar) setupMsg.innerText = "STEP BACK";
+                else if(!isCentered) setupMsg.innerText = "CENTER YOURSELF";
             }
         }
 
@@ -837,6 +918,7 @@
             if(state.phase === 'SETUP') {
                 checkAutoStart(lm);
             } else if(state.phase === 'PLAYING') {
+                checkPlayerPosition(lm);
                 updateFootTracking(lm[27], state.leftFoot, leftFootMesh);
                 updateFootTracking(lm[28], state.rightFoot, rightFootMesh);
             }
@@ -867,6 +949,7 @@
             cameraUtils.start().then(() => {
                 document.getElementById('start-screen').classList.add('hidden');
                 document.getElementById('setup-overlay').style.display = 'block';
+                document.getElementById('guide-reticle').style.display = 'block'; // Show guide
                 state.phase = 'SETUP';
             });
             startBtn.innerText = "Starting...";
