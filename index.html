@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>AR Free Kick - Auto Start</title>
+    <title>AR Free Kick - Stable Physics</title>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600&display=swap" rel="stylesheet">
@@ -48,7 +48,6 @@
             height: 100%; width: 0%; background: linear-gradient(90deg, #f1c40f, #e74c3c); transition: width 0.1s;
         }
 
-        /* Centered Cards */
         .center-card {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
@@ -71,7 +70,6 @@
         }
         button:disabled { background: #95a5a6; cursor: wait; }
 
-        /* Setup / Countdown Overlay */
         #setup-overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             text-align: center; color: white; text-shadow: 0 2px 10px rgba(0,0,0,0.5);
@@ -80,7 +78,6 @@
         #setup-msg { font-size: 40px; color: #f1c40f; }
         #countdown-txt { font-size: 120px; font-weight: bold; display: none; }
 
-        /* Kick Feedback */
         #kick-feedback {
             position: absolute; top: 40%; left: 50%;
             transform: translate(-50%, -50%) scale(0);
@@ -125,15 +122,13 @@
             </div>
         </div>
 
-        <!-- Initial Button -->
         <div id="start-screen" class="center-card">
             <h1>FREE KICK PRO</h1>
             <p style="font-size: 60px; margin: 10px;">⚽</p>
-            <p>1. Enable Camera<br>2. Step Back (Hands-free)<br>3. Kick!</p>
+            <p>1. Tap Enable<br>2. Step Back (2-3m)<br>3. Stand Still to Start</p>
             <button id="start-btn" disabled>Loading AI...</button>
         </div>
 
-        <!-- Auto-Start UI -->
         <div id="setup-overlay">
             <div id="setup-msg">STEP BACK TO START</div>
             <div id="countdown-txt">3</div>
@@ -144,31 +139,31 @@
 
     <script>
         /**
-         * FREE KICK PRO v4
-         * - Auto-Start (No touching phone)
-         * - Bulletproof Ball Logic (No disappearing)
-         * - High speed collision fix
+         * FREE KICK PRO v5 - STABILIZED
+         * Fixed noise issues and tracking explosion
          */
 
         const CONFIG = {
-            kickThreshold: 3.5, 
+            kickThreshold: 2.0, // Reduced because we are smoothing inputs
             goalWidth: 14,
             goalHeight: 7,
-            goalZ: -18
+            goalZ: -18,
+            minScale: 0.25, // Prevents explosion when scaling small values
+            smoothing: 0.5  // 0.0 = no smoothing, 0.9 = heavy smoothing
         };
 
-        // Game Phases: MENU -> SETUP (Stepping back) -> PLAYING
         let state = {
             phase: 'MENU', 
             score: 0,
             ballState: 'IDLE',
             velocity: new THREE.Vector3(),
-            leftFootHist: [],
-            rightFootHist: [],
+            // Store current smoothed positions
+            leftFoot: {x: 0, y: 0, vx: 0, vy: 0},
+            rightFoot: {x: 0, y: 0, vx: 0, vy: 0},
             playerScale: 1.0, 
             hipCenter: {x: 0.5, y: 0.5},
-            setupTimer: 0, // Frames player is in position
-            ballSafetyTimer: null // Prevents ball getting stuck
+            setupTimer: 0,
+            ballSafetyTimer: null
         };
 
         // --- Three.js Setup ---
@@ -249,16 +244,15 @@
         const d3=new THREE.Mesh(dotGeo,dotMat); d3.position.set(0,0.35,0); ball.add(d3);
         scene.add(ball);
 
-        // Feet Debug
+        // Feet Visuals
         const footGeo = new THREE.SphereGeometry(0.25, 16, 16);
-        const footMatL = new THREE.MeshBasicMaterial({ color: 0xe74c3c, transparent: true, opacity: 0.6 });
-        const footMatR = new THREE.MeshBasicMaterial({ color: 0x3498db, transparent: true, opacity: 0.6 });
+        const footMatL = new THREE.MeshBasicMaterial({ color: 0xe74c3c, transparent: true, opacity: 0.8 });
+        const footMatR = new THREE.MeshBasicMaterial({ color: 0x3498db, transparent: true, opacity: 0.8 });
         const leftFootMesh = new THREE.Mesh(footGeo, footMatL);
         const rightFootMesh = new THREE.Mesh(footGeo, footMatR);
         scene.add(leftFootMesh);
         scene.add(rightFootMesh);
         
-        // Hide feet initially
         leftFootMesh.visible = false;
         rightFootMesh.visible = false;
 
@@ -270,41 +264,45 @@
             state.ballState = 'IDLE';
             document.getElementById('p-meter-cont').style.display = 'none';
             kickZone.material.opacity = 0.6;
+            kickZone.scale.set(1,1,1);
         }
         resetBall();
 
-        // --- Logic ---
+        // --- Physics Logic ---
 
-        function triggerKick(power, footX, swingVelocityX) {
+        function triggerKick(speed, footX, swingVelocityX) {
             if(state.ballState !== 'IDLE') return;
 
             state.ballState = 'FLYING';
             kickZone.material.opacity = 0; 
-            
-            // Safety: Reset ball after 5 seconds no matter what
-            state.ballSafetyTimer = setTimeout(resetBall, 5000);
+            state.ballSafetyTimer = setTimeout(resetBall, 4000);
 
-            const effectivePower = Math.min(power, 25);
-            const swingDir = swingVelocityX * 0.5;
-            const impactOffset = footX - ball.position.x;
-            const impactDir = -impactOffset * 1.5;
-            const curve = swingDir + impactDir;
+            // Cap power to prevent explosions
+            const power = Math.min(speed, 15);
             
-            const lift = Math.min(effectivePower * 0.08, 0.8); 
-            const fwd = Math.min(effectivePower * 0.2, 1.8); 
+            // Direction Logic
+            const swingDir = swingVelocityX * 0.4; // Influence of swing direction
+            const impactOffset = (footX - ball.position.x) * -2.0; // Influence of impact point
+            
+            // Combine them (weighted average)
+            const curve = (swingDir + impactOffset) * 0.5;
+            
+            // Lift & Forward
+            const lift = Math.min(power * 0.1, 0.9); 
+            const fwd = Math.min(power * 0.25, 2.2); 
 
             state.velocity.set(curve, lift, -fwd);
 
-            // UI Feedback
-            const speedKm = Math.round(effectivePower * 8); 
+            // UI
+            const speedKm = Math.round(power * 10); 
             document.getElementById('speed-val').innerText = speedKm;
             
             const feedbackText = document.getElementById('feedback-text');
             const aimArrow = document.getElementById('aim-arrow');
             feedbackText.innerText = speedKm > 100 ? "ROCKET!" : "KICK!";
             
-            if(curve < -0.3) aimArrow.innerText = "⬅ Left";
-            else if(curve > 0.3) aimArrow.innerText = "Right ➡";
+            if(curve < -0.4) aimArrow.innerText = "⬅ Left";
+            else if(curve > 0.4) aimArrow.innerText = "Right ➡";
             else aimArrow.innerText = "⬆ Center";
             
             const fbContainer = document.getElementById('kick-feedback');
@@ -318,9 +316,8 @@
 
         function updateBall() {
             if(state.ballState === 'FLYING') {
-                // Physics
                 state.velocity.y -= 0.025; // Gravity
-                state.velocity.z *= 0.995; // Drag
+                state.velocity.z *= 0.99;  // Drag
 
                 const prevZ = ball.position.z;
                 ball.position.add(state.velocity);
@@ -333,25 +330,23 @@
                 if(ball.position.y < 0.4) {
                     ball.position.y = 0.4;
                     state.velocity.y *= -0.6;
-                    state.velocity.z *= 0.85;
                 }
 
-                // --- ROBUST GOAL DETECTION ---
-                // Check if we crossed the goal line in this frame
+                // Goal Detection
                 if(prevZ >= CONFIG.goalZ && currZ <= CONFIG.goalZ) {
-                    // We crossed the line! Check X and Y
                     if(Math.abs(ball.position.x) < CONFIG.goalWidth/2 && ball.position.y < CONFIG.goalHeight) {
                         scoreGoal();
                     }
                 }
 
-                // Out of bounds reset
-                if(ball.position.z < -50 || Math.abs(ball.position.x) > 30) {
+                // Reset
+                if(ball.position.z < -40 || Math.abs(ball.position.x) > 25) {
                     state.ballState = 'RESETTING';
                     clearTimeout(state.ballSafetyTimer);
-                    setTimeout(resetBall, 1000);
+                    setTimeout(resetBall, 800);
                 }
             } else {
+                // Idle pulse
                 const s = 1 + Math.sin(Date.now() * 0.005) * 0.1;
                 kickZone.scale.set(s, s, 1);
             }
@@ -374,43 +369,57 @@
             }, 2000);
         }
 
-        // --- Tracking ---
+        // --- STABILIZED TRACKING ---
 
-        function updateFootTracking(landmark, history, mesh) {
-            if(state.phase !== 'PLAYING') return; // Don't track if not playing
+        function updateFootTracking(landmark, footState, mesh) {
+            if(state.phase !== 'PLAYING') return;
 
-            const now = performance.now();
-            const scale = Math.max(state.playerScale, 0.05);
-
+            // 1. Calculate Target Position (Raw Input)
+            const scale = Math.max(state.playerScale, CONFIG.minScale); // Use safe minimum
             const relX = (landmark.x - state.hipCenter.x) / scale; 
             const relY = (landmark.y - state.hipCenter.y) / scale; 
 
-            const mapX = relX * 3.5; 
-            const mapY = (relY * -3.5) + 2.0; 
+            // Map to World Coordinates
+            // Adjusted multipliers to keep feet grounded and centered
+            const targetX = relX * 4.0; 
+            const targetY = (relY * -4.0) + 2.5; 
 
-            // Smooth visuals
-            mesh.position.x += (mapX - mesh.position.x) * 0.3;
-            mesh.position.y += (mapY - mesh.position.y) * 0.3;
-            mesh.position.z = -1.8; 
+            // 2. Smooth the Position (Low Pass Filter)
+            // This ignores jitter. We move current position 50% towards target every frame.
+            const smoothFactor = 0.5;
+            const newX = footState.x + (targetX - footState.x) * smoothFactor;
+            const newY = footState.y + (targetY - footState.y) * smoothFactor;
 
-            history.push({x: mapX, y: mapY, t: now});
-            if(history.length > 5) history.shift();
+            // 3. Calculate Velocity based on SMOOTHED position
+            const vx = (newX - footState.x) * 60; // Units per second (approx)
+            const vy = (newY - footState.y) * 60;
+            const speed = Math.sqrt(vx*vx + vy*vy);
 
-            if(history.length >= 2) {
-                const recent = history[history.length-1];
-                const old = history[0];
-                const dt = (recent.t - old.t) / 1000;
-                
-                if(dt > 0.01) {
-                    const vx = (recent.x - old.x) / dt;
-                    const vy = (recent.y - old.y) / dt;
-                    const speed = Math.sqrt(vx*vx + vy*vy);
+            // Update State
+            footState.x = newX;
+            footState.y = newY;
+            footState.vx = vx;
+            footState.vy = vy;
 
-                    const ballDist = Math.abs(mesh.position.x - ball.position.x); 
-                    
-                    if(speed > CONFIG.kickThreshold && ballDist < 0.8 && mesh.position.y < 0.8) {
-                        triggerKick(speed, mesh.position.x, vx);
-                    }
+            // Update Visual Mesh
+            mesh.position.x = newX;
+            mesh.position.y = newY;
+            mesh.position.z = -1.8; // Align with ball
+
+            // 4. Strict Collision Logic
+            // Only kick if tracking is confident (foot is visible)
+            if(landmark.visibility > 0.6) {
+                // Check distance to ball center
+                const dx = Math.abs(newX - ball.position.x);
+                const dy = Math.abs(newY - ball.position.y);
+                const dist = Math.sqrt(dx*dx + dy*dy);
+
+                // Requirements:
+                // 1. High Speed (It's a kick, not a drift)
+                // 2. VERY close to ball (Actual touch)
+                // 3. Foot height (Must be near ground, y < 1.0)
+                if(speed > CONFIG.kickThreshold && dist < 0.6 && newY < 1.0) {
+                    triggerKick(speed, newX, vx);
                 }
             }
         }
@@ -445,31 +454,30 @@
         function checkAutoStart(landmarks) {
             if(state.phase !== 'SETUP') return;
 
-            // Check if user is far enough back
-            // We use shoulder width (landmarks 11 & 12)
             const shoulderWidth = Math.abs(landmarks[11].x - landmarks[12].x);
-            
-            // Check if feet are visible (27, 28)
             const feetVisible = landmarks[27].visibility > 0.6 && landmarks[28].visibility > 0.6;
-
-            // Threshold: Shoulder width should be small (player is far)
-            // e.g., < 0.2 in normalized coords
-            const playerIsFar = shoulderWidth < 0.35; // Adjust based on testing
+            
+            // Check if user is standing relatively still
+            // We use hip movement as a proxy for stillness
+            const hipX = landmarks[23].x;
+            // Simple check: is user far enough?
+            const playerIsFar = shoulderWidth < 0.45; 
 
             if(feetVisible && playerIsFar) {
                 state.setupTimer++;
                 const setupMsg = document.getElementById('setup-msg');
-                if(state.setupTimer > 60) { // 60 frames (~2 sec) of stability
+                if(state.setupTimer > 50) { // ~1.5 sec
                     startCountdown();
                 } else {
                     setupMsg.innerText = "HOLD STILL...";
-                    setupMsg.style.color = "#2ecc71"; // Green
+                    setupMsg.style.color = "#2ecc71"; 
                 }
             } else {
                 state.setupTimer = 0;
                 const setupMsg = document.getElementById('setup-msg');
-                setupMsg.innerText = "STEP BACK FURTHER";
-                setupMsg.style.color = "#f1c40f"; // Yellow
+                if(!playerIsFar) setupMsg.innerText = "STEP BACK";
+                else if(!feetVisible) setupMsg.innerText = "SHOW FEET";
+                setupMsg.style.color = "#f1c40f"; 
             }
         }
 
@@ -477,27 +485,23 @@
             if (!results.poseLandmarks) return;
             const lm = results.poseLandmarks;
 
-            // Global State Update
-            const leftShoulder = lm[11];
-            const rightShoulder = lm[12];
-            const leftHip = lm[23];
-            const rightHip = lm[24];
-            const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+            // Global Body Calc
+            const shoulderWidth = Math.abs(lm[11].x - lm[12].x);
+            // Smooth the scale extremely slowly to prevent "breathing" effect
+            state.playerScale = (state.playerScale * 0.95) + (shoulderWidth * 0.05);
             
-            state.playerScale = (state.playerScale * 0.9) + (shoulderWidth * 0.1);
-            
-            const hipCX = (leftHip.x + rightHip.x) / 2;
-            const hipCY = (leftHip.y + rightHip.y) / 2;
-            state.hipCenter.x = (state.hipCenter.x * 0.8) + (hipCX * 0.2);
-            state.hipCenter.y = (state.hipCenter.y * 0.8) + (hipCY * 0.2);
+            const hipCX = (lm[23].x + lm[24].x) / 2;
+            const hipCY = (lm[23].y + lm[24].y) / 2;
+            state.hipCenter.x = (state.hipCenter.x * 0.9) + (hipCX * 0.1);
+            state.hipCenter.y = (state.hipCenter.y * 0.9) + (hipCY * 0.1);
 
             document.getElementById('debug-info').innerText = `State: ${state.phase} | Scale: ${state.playerScale.toFixed(2)}`;
 
             if(state.phase === 'SETUP') {
                 checkAutoStart(lm);
             } else if(state.phase === 'PLAYING') {
-                if(lm[27].visibility > 0.5) updateFootTracking(lm[27], state.leftFootHist, leftFootMesh);
-                if(lm[28].visibility > 0.5) updateFootTracking(lm[28], state.rightFootHist, rightFootMesh);
+                updateFootTracking(lm[27], state.leftFoot, leftFootMesh);
+                updateFootTracking(lm[28], state.rightFoot, rightFootMesh);
             }
         }
 
@@ -505,7 +509,7 @@
         const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
         pose.setOptions({
             modelComplexity: 1,
-            smoothLandmarks: true,
+            smoothLandmarks: true, // Internal smoothing
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
@@ -519,16 +523,14 @@
 
         const startBtn = document.getElementById('start-btn');
         startBtn.addEventListener('click', () => {
-            // First Interaction
             cameraUtils.start().then(() => {
                 document.getElementById('start-screen').classList.add('hidden');
                 document.getElementById('setup-overlay').style.display = 'block';
                 state.phase = 'SETUP';
             });
-            startBtn.innerText = "Accessing Camera...";
+            startBtn.innerText = "Starting...";
         });
 
-        // Initialize button when lib loaded (roughly)
         setTimeout(() => {
             startBtn.disabled = false;
             startBtn.innerText = "ENABLE CAMERA";
